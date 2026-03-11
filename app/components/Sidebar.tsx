@@ -8,15 +8,15 @@ export default function Sidebar() {
   const pages = Array.from({ length: 9 }, (_, i) => i + 1);
 
   return (
-    <aside className="w-64 min-h-screen bg-emerald-800 text-white p-6 flex flex-col">
+    <aside className="fixed top-0 left-0 w-64 h-screen bg-emerald-800 text-white p-6 flex flex-col overflow-y-auto">
       <Link
         href="/"
-        className="text-2xl font-bold mb-8 hover:text-emerald-200 transition-colors"
+        className="text-2xl font-bold mb-8 hover:text-emerald-200 transition-colors flex-shrink-0"
       >
         Home
       </Link>
 
-      <nav className="flex flex-col gap-2">
+      <nav className="flex flex-col gap-2 flex-1">
         {pages.map((num) => {
           const isActive = pathname === `/${num}`;
           return (

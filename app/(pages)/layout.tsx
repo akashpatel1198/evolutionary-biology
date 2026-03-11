@@ -8,7 +8,7 @@ export default function PagesLayout({
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 bg-emerald-50">{children}</main>
+      <main className="flex-1 ml-64 bg-emerald-50">{children}</main>
     </div>
   );
 }
