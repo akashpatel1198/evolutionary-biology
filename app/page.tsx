@@ -8,13 +8,14 @@ export default function Home() {
       <main className="text-center px-8 py-16 max-w-3xl">
         <h1 className="text-5xl font-bold text-emerald-900 mb-6">
           {/* TODO: Add your title here */}
-          Your Title Here
+          Evolutionary Biology
         </h1>
         
-        <p className="text-xl text-emerald-700 mb-12 leading-relaxed">
+        <p className="text-xl text-emerald-700 mb-12 leading-relaxed px-12">
           {/* TODO: Add your description here */}
-          Add your description here. This is a placeholder for you to fill in
-          with details about your project.
+          {`This site is a playground to explore some basic concepts of evolutionary biology.
+          All the pages and simulations are directly inspried by the YouTube channel Primer.
+          `}
         </p>
 
         <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
