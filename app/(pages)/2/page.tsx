@@ -13,6 +13,7 @@ import {
   Legend,
 } from "recharts";
 
+// Grid-related types kept for future use
 interface Entity {
   id: number;
   x: number;
@@ -27,16 +28,17 @@ interface HistoryPoint {
 interface Simulation {
   id: string;
   color: string;
-  entities: Entity[];
-  nextEntityId: number;
+  population: number;
 }
 
+// Grid constants kept for future use
 const CANVAS_SIZE = 400;
 const ENTITY_RADIUS = 6;
+
 const MAX_TICKS = 10000;
 const MAX_SIMULATIONS = 10;
-const MAX_ENTITIES_PER_SIM = 100000;
 const MAX_HISTORY_POINTS = 500;
+const MAX_POPULATION = 999_000_000_000; // 999 billion
 
 const COLORS = [
   "#059669", "#2563eb", "#dc2626", "#7c3aed", "#ea580c",
@@ -46,6 +48,7 @@ const COLORS = [
 ];
 
 export default function Page2() {
+  // Grid ref kept for future use
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Shared parameters for all simulations
@@ -57,8 +60,7 @@ export default function Page2() {
     {
       id: "sim-0",
       color: COLORS[0],
-      entities: [],
-      nextEntityId: 0,
+      population: 0,
     },
   ]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
@@ -69,7 +71,6 @@ export default function Page2() {
   const equilibrium = !isExponential && deathRate > replicationRate
     ? birthRate / (deathRate - replicationRate)
     : Infinity;
-  const netGrowth = replicationRate - deathRate;
 
   const addSimulation = useCallback(() => {
     if (simulations.length >= MAX_SIMULATIONS) return;
@@ -80,8 +81,7 @@ export default function Page2() {
         {
           id: `sim-${newIndex}`,
           color: COLORS[newIndex % COLORS.length],
-          entities: [],
-          nextEntityId: 0,
+          population: 0,
         },
       ];
     });
@@ -90,35 +90,24 @@ export default function Page2() {
   const removeSimulation = useCallback((id: string) => {
     setSimulations((prev) => {
       const filtered = prev.filter((s) => s.id !== id);
-      // Reassign IDs and colors based on new positions
       return filtered.map((s, index) => ({
         ...s,
         id: `sim-${index}`,
         color: COLORS[index % COLORS.length],
       }));
     });
-    // Clear history since simulation IDs changed
     setHistory([]);
   }, []);
 
   const reset = useCallback(() => {
     setSimulations((prev) =>
-      prev.map((s) => ({ ...s, entities: [], nextEntityId: 0 }))
+      prev.map((s) => ({ ...s, population: 0 }))
     );
     setHistory([]);
     setTick(0);
   }, []);
 
-  const spawnEntity = (nextId: number, nearX?: number, nearY?: number): Entity => {
-    const x = nearX !== undefined
-      ? Math.max(0, Math.min(CANVAS_SIZE, nearX + (Math.random() - 0.5) * 30))
-      : Math.random() * CANVAS_SIZE;
-    const y = nearY !== undefined
-      ? Math.max(0, Math.min(CANVAS_SIZE, nearY + (Math.random() - 0.5) * 30))
-      : Math.random() * CANVAS_SIZE;
-    return { id: nextId, x, y };
-  };
-
+  // Simulation using statistical model (much faster than tracking individuals)
   useEffect(() => {
     if (!isRunning) return;
     if (tick >= MAX_TICKS) {
@@ -137,28 +126,62 @@ export default function Page2() {
 
       setSimulations((prev) =>
         prev.map((sim) => {
-          let newEntities = [...sim.entities];
-          let nextId = sim.nextEntityId;
-          const toAdd: Entity[] = [];
+          let pop = sim.population;
 
+          // Spontaneous birth (B chance per tick)
           if (Math.random() < birthRate) {
-            toAdd.push(spawnEntity(nextId++));
+            pop += 1;
           }
 
-          newEntities = newEntities.filter((entity) => {
-            if (Math.random() < replicationRate && newEntities.length + toAdd.length < MAX_ENTITIES_PER_SIM) {
-              toAdd.push(spawnEntity(nextId++, entity.x, entity.y));
-            }
-            return Math.random() >= deathRate;
-          });
+          // For each entity: replication and death
+          // Using binomial approximation for large populations
+          if (pop > 0) {
+            // Expected replications: pop * R
+            // Expected deaths: pop * D
+            // We sample from binomial distributions
+            const replications = binomialSample(pop, replicationRate);
+            const deaths = binomialSample(pop, deathRate);
+            pop = Math.max(0, pop + replications - deaths);
+          }
 
-          return { ...sim, entities: [...newEntities, ...toAdd], nextEntityId: nextId };
+          // Cap at 999 billion
+          pop = Math.min(pop, MAX_POPULATION);
+
+          return { ...sim, population: pop };
         })
       );
     }, 50);
 
     return () => clearInterval(interval);
   }, [isRunning, tick, birthRate, deathRate, replicationRate]);
+
+  // Binomial sampling for realistic stochastic simulation
+  function binomialSample(n: number, p: number): number {
+    if (p === 0) return 0;
+    if (p === 1) return n;
+    
+    // For large n, use normal approximation
+    if (n > 100) {
+      const mean = n * p;
+      const std = Math.sqrt(n * p * (1 - p));
+      const sample = mean + std * gaussianRandom();
+      return Math.max(0, Math.round(sample));
+    }
+    
+    // For small n, direct sampling
+    let successes = 0;
+    for (let i = 0; i < n; i++) {
+      if (Math.random() < p) successes++;
+    }
+    return successes;
+  }
+
+  function gaussianRandom(): number {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  }
 
   const prevTickRef = useRef(-1);
   useEffect(() => {
@@ -169,7 +192,7 @@ export default function Page2() {
     setHistory((prev) => {
       const newPoint: HistoryPoint = { tick };
       simulations.forEach((sim) => {
-        newPoint[sim.id] = sim.entities.length;
+        newPoint[sim.id] = sim.population;
       });
       const newHistory = [...prev, newPoint];
       if (newHistory.length > MAX_HISTORY_POINTS) {
@@ -179,6 +202,7 @@ export default function Page2() {
     });
   }, [tick, simulations]);
 
+  // Grid rendering kept for future use
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -199,21 +223,17 @@ export default function Page2() {
       ctx.lineTo(CANVAS_SIZE, i);
       ctx.stroke();
     }
+  }, []);
 
-    simulations.forEach((sim) => {
-      sim.entities.forEach((entity) => {
-        ctx.beginPath();
-        ctx.arc(entity.x, entity.y, ENTITY_RADIUS, 0, Math.PI * 2);
-        ctx.fillStyle = sim.color;
-        ctx.fill();
-        ctx.strokeStyle = sim.color;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      });
-    });
-  }, [simulations]);
+  const totalPopulation = simulations.reduce((sum, s) => sum + s.population, 0);
 
-  const totalPopulation = simulations.reduce((sum, s) => sum + s.entities.length, 0);
+  // Format large numbers
+  const formatNumber = (n: number): string => {
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + "B";
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+    return n.toString();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-emerald-50">
@@ -255,7 +275,11 @@ export default function Page2() {
                 <LineChart data={history}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="tick" stroke="#9ca3af" fontSize={12} />
-                  <YAxis stroke="#9ca3af" fontSize={12} />
+                  <YAxis 
+                    stroke="#9ca3af" 
+                    fontSize={12}
+                    tickFormatter={(v) => formatNumber(v)}
+                  />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "#fff",
@@ -263,6 +287,7 @@ export default function Page2() {
                       borderRadius: "12px",
                       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                     }}
+                    formatter={(value: number) => [formatNumber(value), "Population"]}
                   />
                   <Legend />
                   {!isExponential && equilibrium < 10000 && (
@@ -310,7 +335,7 @@ export default function Page2() {
                       style={{ backgroundColor: sim.color }}
                     />
                     <span className="text-sm font-medium text-gray-700">
-                      Run {index + 1}: {sim.entities.length}
+                      Run {index + 1}: {formatNumber(sim.population)}
                     </span>
                     {simulations.length > 1 && (
                       <button
@@ -336,12 +361,14 @@ export default function Page2() {
                 </div>
                 <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
                   <p className="text-sm font-medium text-gray-500 mb-1">Total Population</p>
-                  <p className="text-3xl font-bold text-emerald-600">{totalPopulation}</p>
+                  <p className="text-3xl font-bold text-emerald-600">{formatNumber(totalPopulation)}</p>
                 </div>
-                <div className="text-center p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100">
-                  <p className="text-sm font-medium text-gray-500 mb-1">Net Growth</p>
-                  <p className={`text-3xl font-bold ${netGrowth >= 0 ? "text-red-600" : "text-blue-600"}`}>
-                    {(netGrowth * 100).toFixed(1)}%
+                <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Avg Population</p>
+                  <p className="text-3xl font-bold text-blue-600">
+                    {simulations.length > 0
+                      ? formatNumber(Math.round(totalPopulation / simulations.length))
+                      : "0"}
                   </p>
                 </div>
               </div>
@@ -369,7 +396,7 @@ export default function Page2() {
                   }`}
                 >
                   {isExponential
-                    ? `Population will grow without bound! (capped at ${MAX_ENTITIES_PER_SIM.toLocaleString()} for performance)`
+                    ? "Population will grow without bound!"
                     : `Population will stabilize around N* = ${equilibrium.toFixed(1)}`}
                 </p>
               </div>
