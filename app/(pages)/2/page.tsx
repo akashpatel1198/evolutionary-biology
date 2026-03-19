@@ -287,7 +287,7 @@ export default function Page2() {
                       borderRadius: "12px",
                       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                     }}
-                    formatter={(value: number) => [formatNumber(value), "Population"]}
+                    formatter={(value) => [formatNumber(value as number), "Population"]}
                   />
                   <Legend />
                   {!isExponential && equilibrium < 10000 && (
