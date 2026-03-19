@@ -25,6 +25,8 @@ import ReactFlow, {
   getBezierPath,
   BaseEdge,
   EdgeLabelRenderer,
+  ReactFlowProvider,
+  useReactFlow,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -1092,23 +1094,10 @@ interface SpeciesNodeData {
   species: Species;
   isRoot: boolean;
   generation: number;
-  onUpdate: (id: string, updates: Partial<Species>) => void;
-  onDelete: (id: string) => void;
 }
 
-function SpeciesNode({ data, id }: NodeProps<SpeciesNodeData>) {
-  const { species, isRoot, generation, onUpdate, onDelete } = data;
-  const [expanded, setExpanded] = useState(false);
-  
-  const handleToggleExpand = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setExpanded(!expanded);
-  };
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDelete(species.id);
-  };
+function SpeciesNode({ data }: NodeProps<SpeciesNodeData>) {
+  const { species, isRoot, generation } = data;
   
   return (
     <div className="relative">
@@ -1120,120 +1109,24 @@ function SpeciesNode({ data, id }: NodeProps<SpeciesNodeData>) {
       />
       
       <div 
-        className={`bg-white rounded-xl shadow-lg border-2 transition-all nodrag ${
-          expanded ? 'w-56 p-3' : 'w-auto p-2'
-        }`}
+        className="bg-white rounded-xl shadow-lg border-2 p-2 cursor-grab active:cursor-grabbing"
         style={{ borderColor: species.color }}
       >
         <div className="flex items-center gap-2">
-          <button
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md flex-shrink-0"
             style={{ backgroundColor: species.color }}
-            onClick={handleToggleExpand}
           >
             {species.name.charAt(0).toUpperCase()}
-          </button>
-          
-          {expanded ? (
-            <input
-              type="text"
-              value={species.name}
-              onChange={e => onUpdate(species.id, { name: e.target.value })}
-              className="bg-gray-50 text-gray-800 text-sm px-2 py-1 rounded border border-gray-200 flex-1 min-w-0 nopan"
-              onClick={e => e.stopPropagation()}
-            />
-          ) : (
-            <span 
-              className="text-sm font-medium text-gray-700 whitespace-nowrap pr-1 cursor-pointer"
-              onClick={handleToggleExpand}
-            >
-              {species.name}
-            </span>
-          )}
-          
-          {!isRoot && !expanded && (
-            <button
-              onClick={handleDelete}
-              className="text-gray-300 hover:text-red-500 text-lg leading-none"
-            >
-              ×
-            </button>
-          )}
-        </div>
-        
-        <div 
-          className="text-xs text-gray-400 mt-1 text-center cursor-pointer"
-          onClick={handleToggleExpand}
-        >
-          Gen {generation} {isRoot && '• Root'}
-        </div>
-        
-        {expanded && (
-          <div className="mt-3 pt-3 border-t border-gray-100 space-y-3 nopan">
-            <div className="flex flex-wrap gap-1.5">
-              {COLOR_PALETTE.map(color => (
-                <button
-                  key={color}
-                  onClick={(e) => { e.stopPropagation(); onUpdate(species.id, { color }); }}
-                  className={`w-5 h-5 rounded-full border-2 transition-all ${
-                    species.color === color ? 'border-gray-700 scale-110' : 'border-gray-200'
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
-            
-            <div>
-              <label className="text-xs text-gray-500 flex justify-between">
-                <span>Death Rate (D)</span>
-                <span className="text-red-500">{(species.deathRate * 100).toFixed(0)}%</span>
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="30"
-                value={species.deathRate * 100}
-                onChange={e => onUpdate(species.id, { deathRate: parseInt(e.target.value) / 100 })}
-                className="w-full accent-red-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
-              />
-            </div>
-            
-            <div>
-              <label className="text-xs text-gray-500 flex justify-between">
-                <span>Replication Rate (R)</span>
-                <span className="text-green-500">{(species.replicationRate * 100).toFixed(0)}%</span>
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="30"
-                value={species.replicationRate * 100}
-                onChange={e => onUpdate(species.id, { replicationRate: parseInt(e.target.value) / 100 })}
-                className="w-full accent-green-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
-              />
-            </div>
-            
-            <div className={`text-xs font-medium text-center py-1 rounded ${
-              species.replicationRate > species.deathRate 
-                ? 'text-green-600 bg-green-50' 
-                : species.replicationRate < species.deathRate 
-                  ? 'text-red-600 bg-red-50' 
-                  : 'text-gray-500 bg-gray-50'
-            }`}>
-              R - D = {((species.replicationRate - species.deathRate) * 100).toFixed(0)}%
-              {species.replicationRate > species.deathRate ? ' Growing' : species.replicationRate < species.deathRate ? ' Declining' : ' Stable'}
-            </div>
-            
-            {!isRoot && (
-              <button
-                onClick={handleDelete}
-                className="w-full text-xs px-2 py-1.5 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-              >
-                Delete Species
-              </button>
-            )}
           </div>
-        )}
+          <span className="text-sm font-medium text-gray-700 whitespace-nowrap pr-1">
+            {species.name}
+          </span>
+        </div>
+        
+        <div className="text-xs text-gray-400 mt-1 text-center">
+          Gen {generation === -1 ? '?' : generation} {isRoot && '• Root'}
+        </div>
       </div>
       
       <Handle
@@ -1299,10 +1192,10 @@ function MutationEdge({
                 max="50"
                 value={tempChance * 100}
                 onChange={e => setTempChance(parseInt(e.target.value) / 100)}
-                className="w-12 text-xs text-center border border-gray-200 rounded px-1 py-0.5"
+                className="w-12 text-xs text-center border border-gray-200 rounded px-1 py-0.5 text-gray-900"
                 autoFocus
               />
-              <span className="text-xs text-gray-500">%</span>
+              <span className="text-xs text-gray-700">%</span>
               <button
                 onClick={() => {
                   data?.onUpdate(source, target, tempChance);
@@ -1335,6 +1228,95 @@ function MutationEdge({
 
 const nodeTypes = { species: SpeciesNode };
 const edgeTypes = { mutation: MutationEdge };
+
+interface MutationTreeEditorProps {
+  nodes: Node<SpeciesNodeData>[];
+  edges: Edge<MutationEdgeData>[];
+  onNodesChange: (changes: any) => void;
+  onEdgesChange: (changes: any) => void;
+  onConnect: (connection: Connection) => void;
+  autoFormatNodes: () => void;
+}
+
+function MutationTreeEditorInner({ 
+  nodes, 
+  edges, 
+  onNodesChange, 
+  onEdgesChange, 
+  onConnect,
+  autoFormatNodes 
+}: MutationTreeEditorProps) {
+  const { fitView } = useReactFlow();
+
+  const handleRecenter = () => {
+    fitView({ padding: 0.2, duration: 300 });
+  };
+
+  return (
+    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold text-gray-700">Mutation Tree</p>
+        <div className="flex gap-2">
+          <button
+            onClick={handleRecenter}
+            className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors flex items-center gap-1"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+            Recenter
+          </button>
+          <button
+            onClick={autoFormatNodes}
+            className="text-xs px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors flex items-center gap-1"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+            Auto Format
+          </button>
+        </div>
+      </div>
+
+      <div className="h-64 bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          fitView
+          proOptions={{ hideAttribution: true }}
+          defaultEdgeOptions={{
+            type: 'mutation',
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#ec4899',
+            },
+          }}
+          connectionLineStyle={{ stroke: '#ec4899', strokeWidth: 2 }}
+          className="bg-transparent"
+        />
+      </div>
+
+      <div className="mt-3 text-xs text-gray-500 space-y-1">
+        <p><span className="font-medium text-gray-600">Connect:</span> Drag from right handle → left handle to create mutation link</p>
+        <p><span className="font-medium text-gray-600">Navigate:</span> Scroll to zoom, click and drag background to pan view</p>
+        <p><span className="font-medium text-gray-600">Edit:</span> Drag nodes to reposition, click connection % to edit mutation rate</p>
+      </div>
+    </div>
+  );
+}
+
+function MutationTreeEditor(props: MutationTreeEditorProps) {
+  return (
+    <ReactFlowProvider>
+      <MutationTreeEditorInner {...props} />
+    </ReactFlowProvider>
+  );
+}
 
 function CustomMutationTreeSection() {
   const [species, setSpecies] = useState<Species[]>(DEFAULT_SPECIES);
@@ -1402,7 +1384,7 @@ function CustomMutationTreeSection() {
     setMutations(prev => prev.filter(m => !(m.from === from && m.to === to)));
   }, []);
 
-  const initialNodes = useMemo((): Node<SpeciesNodeData>[] => {
+  const getAutoLayoutPositions = useCallback(() => {
     const gens = getSpeciesGenerations();
     const maxGen = Math.max(0, ...Object.values(gens).filter(g => g >= 0));
     
@@ -1412,51 +1394,29 @@ function CustomMutationTreeSection() {
     }
     const unconnected = species.filter(s => gens[s.id] === -1);
     
-    const nodes: Node<SpeciesNodeData>[] = [];
+    const positions: Record<string, { x: number; y: number }> = {};
     const xSpacing = 180;
-    const ySpacing = 100;
+    const ySpacing = 90;
     
     for (let gen = 0; gen <= maxGen; gen++) {
       const speciesInGen = speciesByGen[gen] || [];
       speciesInGen.forEach((spec, idx) => {
-        nodes.push({
-          id: spec.id,
-          type: 'species',
-          position: { 
-            x: gen * xSpacing + 50, 
-            y: idx * ySpacing + 50 
-          },
-          data: {
-            species: spec,
-            isRoot: spec.id === species[0]?.id,
-            generation: gen,
-            onUpdate: updateSpecies,
-            onDelete: removeSpecies,
-          },
-        });
+        positions[spec.id] = { 
+          x: gen * xSpacing + 50, 
+          y: idx * ySpacing + 50 
+        };
       });
     }
     
     unconnected.forEach((spec, idx) => {
-      nodes.push({
-        id: spec.id,
-        type: 'species',
-        position: { 
-          x: (maxGen + 1) * xSpacing + 100, 
-          y: idx * ySpacing + 50 
-        },
-        data: {
-          species: spec,
-          isRoot: false,
-          generation: -1,
-          onUpdate: updateSpecies,
-          onDelete: removeSpecies,
-        },
-      });
+      positions[spec.id] = { 
+        x: (maxGen + 1) * xSpacing + 100, 
+        y: idx * ySpacing + 50 
+      };
     });
     
-    return nodes;
-  }, [species, getSpeciesGenerations, updateSpecies, removeSpecies]);
+    return positions;
+  }, [species, getSpeciesGenerations]);
 
   const initialEdges = useMemo((): Edge<MutationEdgeData>[] => {
     return mutations.map(m => ({
@@ -1472,12 +1432,48 @@ function CustomMutationTreeSection() {
     }));
   }, [mutations, updateMutationChance, removeMutation]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState<SpeciesNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const initializedRef = useRef(false);
+
+  const autoFormatNodes = useCallback(() => {
+    const positions = getAutoLayoutPositions();
+    setNodes(prev => prev.map(node => ({
+      ...node,
+      position: positions[node.id] || node.position,
+    })));
+  }, [getAutoLayoutPositions, setNodes]);
 
   useEffect(() => {
-    setNodes(initialNodes);
-  }, [initialNodes, setNodes]);
+    const gens = getSpeciesGenerations();
+    const positions = getAutoLayoutPositions();
+    
+    setNodes(prev => {
+      const existingPositions = Object.fromEntries(prev.map(n => [n.id, n.position]));
+      
+      return species.map(spec => ({
+        id: spec.id,
+        type: 'species',
+        position: existingPositions[spec.id] || positions[spec.id] || { x: 0, y: 0 },
+        data: {
+          species: spec,
+          isRoot: spec.id === species[0]?.id,
+          generation: gens[spec.id] ?? -1,
+        },
+      }));
+    });
+    
+    if (!initializedRef.current && species.length > 0) {
+      initializedRef.current = true;
+      setTimeout(() => {
+        const positions = getAutoLayoutPositions();
+        setNodes(prev => prev.map(node => ({
+          ...node,
+          position: positions[node.id] || node.position,
+        })));
+      }, 50);
+    }
+  }, [species, getSpeciesGenerations, getAutoLayoutPositions, setNodes]);
 
   useEffect(() => {
     setEdges(initialEdges);
@@ -1525,6 +1521,20 @@ function CustomMutationTreeSection() {
     setSpecies(DEFAULT_SPECIES);
     setMutations(DEFAULT_MUTATIONS);
     reset();
+    setTimeout(() => autoFormatNodes(), 100);
+  };
+
+  const COLOR_NAMES: Record<string, string> = {
+    "#3b82f6": "Blue",
+    "#22c55e": "Green", 
+    "#ef4444": "Red",
+    "#f97316": "Orange",
+    "#8b5cf6": "Purple",
+    "#ec4899": "Pink",
+    "#14b8a6": "Teal",
+    "#f59e0b": "Amber",
+    "#6366f1": "Indigo",
+    "#84cc16": "Lime",
   };
 
   const addSpecies = () => {
@@ -1532,9 +1542,10 @@ function CustomMutationTreeSection() {
     const availableColor = COLOR_PALETTE.find(c => !usedColors.includes(c)) || "#888888";
     const newId = `species_${Date.now()}`;
     const lastSpecies = species[species.length - 1];
+    const colorName = COLOR_NAMES[availableColor] || `Species ${species.length + 1}`;
     setSpecies([...species, {
       id: newId,
-      name: `Species ${species.length + 1}`,
+      name: colorName,
       color: availableColor,
       birthRate: 0,
       deathRate: lastSpecies?.deathRate || 0.1,
@@ -1678,50 +1689,160 @@ function CustomMutationTreeSection() {
         </div>
 
         <div className="p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-700">Mutation Tree Editor</p>
-            <div className="flex gap-2">
-              <button
-                onClick={loadPreset}
-                className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-              >
-                Load Default
-              </button>
-              <button
-                onClick={addSpecies}
-                className="text-xs px-3 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors"
-              >
-                + Add Species
-              </button>
+          {/* Species List with Controls */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-700">Species</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={loadPreset}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  Load Default
+                </button>
+                <button
+                  onClick={addSpecies}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors"
+                >
+                  + Add Species
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              {species.map((s, idx) => {
+                const netGrowth = s.replicationRate - s.deathRate;
+                const glowClass = netGrowth > 0 
+                  ? 'shadow-green-200/60 shadow-md border-green-200' 
+                  : netGrowth < 0 
+                    ? 'shadow-red-200/60 shadow-md border-red-200' 
+                    : 'shadow-orange-200/60 shadow-md border-orange-200';
+                
+                const randomizeRates = (mode: 'random' | 'declining' | 'growing') => {
+                  let newR: number, newD: number;
+                  if (mode === 'random') {
+                    newR = Math.floor(Math.random() * 26) / 100;
+                    newD = Math.floor(Math.random() * 26) / 100;
+                  } else if (mode === 'declining') {
+                    newD = Math.floor(Math.random() * 21 + 5) / 100;
+                    newR = Math.floor(Math.random() * Math.min(newD * 100 - 1, 20)) / 100;
+                  } else {
+                    newR = Math.floor(Math.random() * 21 + 5) / 100;
+                    newD = Math.floor(Math.random() * Math.min(newR * 100 - 1, 20)) / 100;
+                  }
+                  updateSpecies(s.id, { replicationRate: newR, deathRate: newD });
+                };
+                
+                return (
+                  <div
+                    key={s.id}
+                    className={`bg-gray-50 rounded-xl p-3 border transition-all ${glowClass}`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <div
+                        className="w-6 h-6 rounded-full border-2 border-white shadow cursor-pointer relative group"
+                        style={{ backgroundColor: s.color }}
+                        onClick={() => {
+                          const currentIdx = COLOR_PALETTE.indexOf(s.color);
+                          const nextColor = COLOR_PALETTE[(currentIdx + 1) % COLOR_PALETTE.length];
+                          updateSpecies(s.id, { color: nextColor });
+                        }}
+                      >
+                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-xs text-gray-400 opacity-0 group-hover:opacity-100 whitespace-nowrap">
+                          click to change
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        value={s.name}
+                        onChange={e => updateSpecies(s.id, { name: e.target.value })}
+                        className="bg-white text-gray-800 text-sm px-2 py-1 rounded border border-gray-300 w-24"
+                      />
+                      <span className="text-xs text-gray-500">
+                        {idx === 0 ? "(Root - Gen 0, B=1)" : `(Gen ${speciesGenerations[s.id] === -1 ? '?' : speciesGenerations[s.id]}, B=0)`}
+                      </span>
+                      
+                      <div className="flex gap-1 ml-auto mr-4">
+                        <button
+                          onClick={() => randomizeRates('random')}
+                          className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors"
+                        >
+                          Random
+                        </button>
+                        <button
+                          onClick={() => randomizeRates('declining')}
+                          className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                        >
+                          Declining
+                        </button>
+                        <button
+                          onClick={() => randomizeRates('growing')}
+                          className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
+                        >
+                          Growing
+                        </button>
+                      </div>
+                      
+                      {idx !== 0 && (
+                        <button
+                          onClick={() => removeSpecies(s.id)}
+                          className="text-gray-400 hover:text-red-500 text-sm"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">
+                          Death Rate (D): {(s.deathRate * 100).toFixed(0)}%
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="30"
+                          value={s.deathRate * 100}
+                          onChange={e => updateSpecies(s.id, { deathRate: parseInt(e.target.value) / 100 })}
+                          className="w-full accent-red-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">
+                          Replication Rate (R): {(s.replicationRate * 100).toFixed(0)}%
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="30"
+                          value={s.replicationRate * 100}
+                          onChange={e => updateSpecies(s.id, { replicationRate: parseInt(e.target.value) / 100 })}
+                          className="w-full accent-green-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3">
+                      <span className={`text-xs font-medium ${netGrowth > 0 ? 'text-green-600' : netGrowth < 0 ? 'text-red-600' : 'text-orange-500'}`}>
+                        R - D = {(netGrowth * 100).toFixed(0)}%
+                        {netGrowth > 0 ? ' (Growing)' : netGrowth < 0 ? ' (Declining)' : ' (Stable)'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          <div className="h-80 bg-gradient-to-br from-slate-50 to-gray-100 rounded-xl border border-gray-200 overflow-hidden">
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              nodeTypes={nodeTypes}
-              edgeTypes={edgeTypes}
-              fitView
-              proOptions={{ hideAttribution: true }}
-              defaultEdgeOptions={{
-                type: 'mutation',
-                markerEnd: {
-                  type: MarkerType.ArrowClosed,
-                  color: '#ec4899',
-                },
-              }}
-              connectionLineStyle={{ stroke: '#ec4899', strokeWidth: 2 }}
-              className="bg-transparent"
-            >
-              <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur rounded-lg px-3 py-2 text-xs text-gray-500 shadow-sm border border-gray-100">
-                <span className="font-medium">Tip:</span> Drag from right handle → left handle to connect
-              </div>
-            </ReactFlow>
-          </div>
+          {/* Mutation Tree Visualization */}
+          <MutationTreeEditor
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            autoFormatNodes={autoFormatNodes}
+          />
 
           {unconnectedSpecies.length > 0 && (
             <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
