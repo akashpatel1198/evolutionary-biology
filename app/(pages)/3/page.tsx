@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   AreaChart,
   Area,
@@ -10,6 +10,23 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import ReactFlow, {
+  Node,
+  Edge,
+  addEdge,
+  Connection,
+  useNodesState,
+  useEdgesState,
+  Handle,
+  Position,
+  MarkerType,
+  NodeProps,
+  EdgeProps,
+  getBezierPath,
+  BaseEdge,
+  EdgeLabelRenderer,
+} from "reactflow";
+import "reactflow/dist/style.css";
 
 // ============================================================================
 // TYPES
@@ -1050,7 +1067,7 @@ function KeyInsightSection() {
 }
 
 // ============================================================================
-// SECTION 6: CUSTOM MUTATION TREE SANDBOX
+// SECTION 6: CUSTOM MUTATION TREE SANDBOX (React Flow)
 // ============================================================================
 
 const DEFAULT_SPECIES: Species[] = [
@@ -1071,6 +1088,254 @@ const COLOR_PALETTE = [
   "#ec4899", "#14b8a6", "#f59e0b", "#6366f1", "#84cc16"
 ];
 
+interface SpeciesNodeData {
+  species: Species;
+  isRoot: boolean;
+  generation: number;
+  onUpdate: (id: string, updates: Partial<Species>) => void;
+  onDelete: (id: string) => void;
+}
+
+function SpeciesNode({ data, id }: NodeProps<SpeciesNodeData>) {
+  const { species, isRoot, generation, onUpdate, onDelete } = data;
+  const [expanded, setExpanded] = useState(false);
+  
+  const handleToggleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpanded(!expanded);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete(species.id);
+  };
+  
+  return (
+    <div className="relative">
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!bg-pink-400 !w-3 !h-3 !border-2 !border-white"
+        style={{ visibility: isRoot ? 'hidden' : 'visible' }}
+      />
+      
+      <div 
+        className={`bg-white rounded-xl shadow-lg border-2 transition-all nodrag ${
+          expanded ? 'w-56 p-3' : 'w-auto p-2'
+        }`}
+        style={{ borderColor: species.color }}
+      >
+        <div className="flex items-center gap-2">
+          <button
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
+            style={{ backgroundColor: species.color }}
+            onClick={handleToggleExpand}
+          >
+            {species.name.charAt(0).toUpperCase()}
+          </button>
+          
+          {expanded ? (
+            <input
+              type="text"
+              value={species.name}
+              onChange={e => onUpdate(species.id, { name: e.target.value })}
+              className="bg-gray-50 text-gray-800 text-sm px-2 py-1 rounded border border-gray-200 flex-1 min-w-0 nopan"
+              onClick={e => e.stopPropagation()}
+            />
+          ) : (
+            <span 
+              className="text-sm font-medium text-gray-700 whitespace-nowrap pr-1 cursor-pointer"
+              onClick={handleToggleExpand}
+            >
+              {species.name}
+            </span>
+          )}
+          
+          {!isRoot && !expanded && (
+            <button
+              onClick={handleDelete}
+              className="text-gray-300 hover:text-red-500 text-lg leading-none"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        
+        <div 
+          className="text-xs text-gray-400 mt-1 text-center cursor-pointer"
+          onClick={handleToggleExpand}
+        >
+          Gen {generation} {isRoot && '• Root'}
+        </div>
+        
+        {expanded && (
+          <div className="mt-3 pt-3 border-t border-gray-100 space-y-3 nopan">
+            <div className="flex flex-wrap gap-1.5">
+              {COLOR_PALETTE.map(color => (
+                <button
+                  key={color}
+                  onClick={(e) => { e.stopPropagation(); onUpdate(species.id, { color }); }}
+                  className={`w-5 h-5 rounded-full border-2 transition-all ${
+                    species.color === color ? 'border-gray-700 scale-110' : 'border-gray-200'
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+            
+            <div>
+              <label className="text-xs text-gray-500 flex justify-between">
+                <span>Death Rate (D)</span>
+                <span className="text-red-500">{(species.deathRate * 100).toFixed(0)}%</span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="30"
+                value={species.deathRate * 100}
+                onChange={e => onUpdate(species.id, { deathRate: parseInt(e.target.value) / 100 })}
+                className="w-full accent-red-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
+              />
+            </div>
+            
+            <div>
+              <label className="text-xs text-gray-500 flex justify-between">
+                <span>Replication Rate (R)</span>
+                <span className="text-green-500">{(species.replicationRate * 100).toFixed(0)}%</span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="30"
+                value={species.replicationRate * 100}
+                onChange={e => onUpdate(species.id, { replicationRate: parseInt(e.target.value) / 100 })}
+                className="w-full accent-green-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
+              />
+            </div>
+            
+            <div className={`text-xs font-medium text-center py-1 rounded ${
+              species.replicationRate > species.deathRate 
+                ? 'text-green-600 bg-green-50' 
+                : species.replicationRate < species.deathRate 
+                  ? 'text-red-600 bg-red-50' 
+                  : 'text-gray-500 bg-gray-50'
+            }`}>
+              R - D = {((species.replicationRate - species.deathRate) * 100).toFixed(0)}%
+              {species.replicationRate > species.deathRate ? ' Growing' : species.replicationRate < species.deathRate ? ' Declining' : ' Stable'}
+            </div>
+            
+            {!isRoot && (
+              <button
+                onClick={handleDelete}
+                className="w-full text-xs px-2 py-1.5 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+              >
+                Delete Species
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!bg-pink-400 !w-3 !h-3 !border-2 !border-white"
+      />
+    </div>
+  );
+}
+
+interface MutationEdgeData {
+  chance: number;
+  onUpdate: (from: string, to: string, chance: number) => void;
+  onDelete: (from: string, to: string) => void;
+}
+
+function MutationEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  data,
+  source,
+  target,
+}: EdgeProps<MutationEdgeData>) {
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+
+  const [editing, setEditing] = useState(false);
+  const [tempChance, setTempChance] = useState(data?.chance ?? 0.1);
+
+  return (
+    <>
+      <BaseEdge 
+        path={edgePath} 
+        markerEnd={MarkerType.ArrowClosed}
+        style={{ stroke: '#ec4899', strokeWidth: 2 }}
+      />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+          }}
+          className="nodrag nopan"
+        >
+          {editing ? (
+            <div className="bg-white rounded-lg shadow-lg border border-pink-200 p-2 flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={tempChance * 100}
+                onChange={e => setTempChance(parseInt(e.target.value) / 100)}
+                className="w-12 text-xs text-center border border-gray-200 rounded px-1 py-0.5"
+                autoFocus
+              />
+              <span className="text-xs text-gray-500">%</span>
+              <button
+                onClick={() => {
+                  data?.onUpdate(source, target, tempChance);
+                  setEditing(false);
+                }}
+                className="text-xs px-2 py-0.5 bg-pink-500 text-white rounded hover:bg-pink-600"
+              >
+                ✓
+              </button>
+              <button
+                onClick={() => data?.onDelete(source, target)}
+                className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200"
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setEditing(true)}
+              className="bg-pink-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow hover:bg-pink-600 transition-colors"
+            >
+              {((data?.chance ?? 0.1) * 100).toFixed(0)}%
+            </button>
+          )}
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+const nodeTypes = { species: SpeciesNode };
+const edgeTypes = { mutation: MutationEdge };
+
 function CustomMutationTreeSection() {
   const [species, setSpecies] = useState<Species[]>(DEFAULT_SPECIES);
   const [mutations, setMutations] = useState<MutationLink[]>(DEFAULT_MUTATIONS);
@@ -1085,17 +1350,10 @@ function CustomMutationTreeSection() {
   const nextIdRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  const [editingSpecies, setEditingSpecies] = useState<string | null>(null);
-  const [addingMutation, setAddingMutation] = useState(false);
-  const [newMutationFrom, setNewMutationFrom] = useState("");
-  const [newMutationTo, setNewMutationTo] = useState("");
-  const [newMutationChance, setNewMutationChance] = useState(0.1);
-  const [linkError, setLinkError] = useState("");
-
   const MAX_POPULATION = 1500;
   const SANDBOX_CANVAS = 350;
 
-  const getSpeciesGenerations = useCallback(() => {
+  const getSpeciesGenerations = useCallback((): Record<string, number> => {
     const generations: Record<string, number> = {};
     if (species.length === 0) return generations;
     
@@ -1121,7 +1379,135 @@ function CustomMutationTreeSection() {
     return generations;
   }, [species, mutations]);
 
-  const speciesGenerations = getSpeciesGenerations();
+  const speciesGenerations = useMemo(() => getSpeciesGenerations(), [getSpeciesGenerations]);
+
+  const updateSpecies = useCallback((id: string, updates: Partial<Species>) => {
+    setSpecies(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+  }, []);
+
+  const removeSpecies = useCallback((id: string) => {
+    if (species.length <= 1) return;
+    if (species[0].id === id) return;
+    setSpecies(prev => prev.filter(s => s.id !== id));
+    setMutations(prev => prev.filter(m => m.from !== id && m.to !== id));
+  }, [species]);
+
+  const updateMutationChance = useCallback((from: string, to: string, chance: number) => {
+    setMutations(prev => prev.map(m => 
+      m.from === from && m.to === to ? { ...m, chance } : m
+    ));
+  }, []);
+
+  const removeMutation = useCallback((from: string, to: string) => {
+    setMutations(prev => prev.filter(m => !(m.from === from && m.to === to)));
+  }, []);
+
+  const initialNodes = useMemo((): Node<SpeciesNodeData>[] => {
+    const gens = getSpeciesGenerations();
+    const maxGen = Math.max(0, ...Object.values(gens).filter(g => g >= 0));
+    
+    const speciesByGen: Record<number, Species[]> = {};
+    for (let g = 0; g <= maxGen; g++) {
+      speciesByGen[g] = species.filter(s => gens[s.id] === g);
+    }
+    const unconnected = species.filter(s => gens[s.id] === -1);
+    
+    const nodes: Node<SpeciesNodeData>[] = [];
+    const xSpacing = 180;
+    const ySpacing = 100;
+    
+    for (let gen = 0; gen <= maxGen; gen++) {
+      const speciesInGen = speciesByGen[gen] || [];
+      speciesInGen.forEach((spec, idx) => {
+        nodes.push({
+          id: spec.id,
+          type: 'species',
+          position: { 
+            x: gen * xSpacing + 50, 
+            y: idx * ySpacing + 50 
+          },
+          data: {
+            species: spec,
+            isRoot: spec.id === species[0]?.id,
+            generation: gen,
+            onUpdate: updateSpecies,
+            onDelete: removeSpecies,
+          },
+        });
+      });
+    }
+    
+    unconnected.forEach((spec, idx) => {
+      nodes.push({
+        id: spec.id,
+        type: 'species',
+        position: { 
+          x: (maxGen + 1) * xSpacing + 100, 
+          y: idx * ySpacing + 50 
+        },
+        data: {
+          species: spec,
+          isRoot: false,
+          generation: -1,
+          onUpdate: updateSpecies,
+          onDelete: removeSpecies,
+        },
+      });
+    });
+    
+    return nodes;
+  }, [species, getSpeciesGenerations, updateSpecies, removeSpecies]);
+
+  const initialEdges = useMemo((): Edge<MutationEdgeData>[] => {
+    return mutations.map(m => ({
+      id: `${m.from}-${m.to}`,
+      source: m.from,
+      target: m.to,
+      type: 'mutation',
+      data: {
+        chance: m.chance,
+        onUpdate: updateMutationChance,
+        onDelete: removeMutation,
+      },
+    }));
+  }, [mutations, updateMutationChance, removeMutation]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  useEffect(() => {
+    setNodes(initialNodes);
+  }, [initialNodes, setNodes]);
+
+  useEffect(() => {
+    setEdges(initialEdges);
+  }, [initialEdges, setEdges]);
+
+  const onConnect = useCallback((connection: Connection) => {
+    if (!connection.source || !connection.target) return;
+    
+    const sourceGen = speciesGenerations[connection.source];
+    const targetGen = speciesGenerations[connection.target];
+    
+    if (sourceGen === -1) {
+      return;
+    }
+    
+    const targetHasIncoming = mutations.some(m => m.to === connection.target);
+    if (targetHasIncoming) {
+      return;
+    }
+    
+    if (targetGen !== -1 && targetGen <= sourceGen) {
+      return;
+    }
+    
+    setMutations(prev => [...prev, { 
+      from: connection.source!, 
+      to: connection.target!, 
+      chance: 0.1 
+    }]);
+  }, [speciesGenerations, mutations]);
 
   const reset = useCallback(() => {
     entitiesRef.current = [];
@@ -1155,74 +1541,6 @@ function CustomMutationTreeSection() {
       replicationRate: lastSpecies?.replicationRate || 0.05,
     }]);
   };
-
-  const removeSpecies = (id: string) => {
-    if (species.length <= 1) return;
-    if (species[0].id === id) return;
-    setSpecies(species.filter(s => s.id !== id));
-    setMutations(mutations.filter(m => m.from !== id && m.to !== id));
-  };
-
-  const updateSpecies = (id: string, updates: Partial<Species>) => {
-    setSpecies(species.map(s => s.id === id ? { ...s, ...updates } : s));
-  };
-
-  const canLinkSpecies = (fromId: string, toId: string): { valid: boolean; error: string } => {
-    if (!fromId || !toId) return { valid: false, error: "" };
-    if (fromId === toId) return { valid: false, error: "Cannot link a species to itself" };
-    
-    const exists = mutations.some(m => m.from === fromId && m.to === toId);
-    if (exists) return { valid: false, error: "This link already exists" };
-    
-    const toHasIncoming = mutations.some(m => m.to === toId);
-    if (toHasIncoming) return { valid: false, error: "Target already has an incoming mutation (would create multiple parents)" };
-    
-    const fromGen = speciesGenerations[fromId];
-    const toGen = speciesGenerations[toId];
-    
-    if (fromGen === -1) {
-      return { valid: false, error: "Source species is not connected to the tree yet" };
-    }
-    
-    if (toGen !== -1 && toGen <= fromGen) {
-      return { valid: false, error: `Cannot link backwards: ${species.find(s => s.id === toId)?.name} is Gen ${toGen}, but source is Gen ${fromGen}` };
-    }
-    
-    return { valid: true, error: "" };
-  };
-
-  const addMutation = () => {
-    const validation = canLinkSpecies(newMutationFrom, newMutationTo);
-    if (!validation.valid) {
-      setLinkError(validation.error);
-      return;
-    }
-    setMutations([...mutations, { from: newMutationFrom, to: newMutationTo, chance: newMutationChance }]);
-    setAddingMutation(false);
-    setNewMutationFrom("");
-    setNewMutationTo("");
-    setNewMutationChance(0.1);
-    setLinkError("");
-  };
-
-  const removeMutation = (from: string, to: string) => {
-    setMutations(mutations.filter(m => !(m.from === from && m.to === to)));
-  };
-
-  const updateMutationChance = (from: string, to: string, chance: number) => {
-    setMutations(mutations.map(m => 
-      m.from === from && m.to === to ? { ...m, chance } : m
-    ));
-  };
-
-  useEffect(() => {
-    if (newMutationFrom && newMutationTo) {
-      const validation = canLinkSpecies(newMutationFrom, newMutationTo);
-      setLinkError(validation.error);
-    } else {
-      setLinkError("");
-    }
-  }, [newMutationFrom, newMutationTo]);
 
   useEffect(() => {
     if (!isRunning || isPaused) return;
@@ -1340,90 +1658,7 @@ function CustomMutationTreeSection() {
 
   const totalPop = Object.values(populations).reduce((a, b) => a + b, 0);
 
-  const buildMutationTree = () => {
-    const maxGen = Math.max(0, ...Object.values(speciesGenerations).filter(g => g >= 0));
-    
-    const speciesByGen: Record<number, Species[]> = {};
-    for (let g = 0; g <= maxGen; g++) {
-      speciesByGen[g] = species.filter(s => speciesGenerations[s.id] === g);
-    }
-    
-    const unconnected = species.filter(s => speciesGenerations[s.id] === -1);
-    
-    if (species.length === 0) {
-      return <p className="text-gray-500 text-sm text-center">No species defined</p>;
-    }
-
-    const getMutationTo = (speciesId: string) => {
-      return mutations.filter(m => m.from === speciesId);
-    };
-
-    return (
-      <div className="space-y-6">
-        <div className="flex items-start justify-center gap-8 overflow-x-auto py-2">
-          {Array.from({ length: maxGen + 1 }, (_, gen) => (
-            <div key={gen} className="flex flex-col items-center gap-4 min-w-fit">
-              <span className="text-xs text-gray-400 font-medium">Gen {gen}</span>
-              <div className="flex flex-col gap-4">
-                {speciesByGen[gen]?.map(spec => {
-                  const outgoingMuts = getMutationTo(spec.id);
-                  return (
-                    <div key={spec.id} className="flex items-center gap-3">
-                      <div className="flex flex-col items-center">
-                        <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md"
-                          style={{ backgroundColor: spec.color }}
-                        >
-                          {spec.name.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="text-xs text-gray-600 mt-1 whitespace-nowrap">{spec.name}</span>
-                      </div>
-                      {outgoingMuts.length > 0 && (
-                        <div className="flex flex-col gap-2">
-                          {outgoingMuts.map(m => (
-                            <div key={`${m.from}-${m.to}`} className="flex items-center gap-1">
-                              <svg className="w-6 h-4 text-gray-300" viewBox="0 0 24 16">
-                                <path d="M0 8 L18 8 M14 4 L18 8 L14 12" stroke="currentColor" strokeWidth="2" fill="none" />
-                              </svg>
-                              <span className="text-xs text-pink-500 font-semibold bg-pink-50 px-1.5 py-0.5 rounded">
-                                {(m.chance * 100).toFixed(0)}%
-                              </span>
-                              <svg className="w-4 h-4 text-gray-300" viewBox="0 0 16 16">
-                                <path d="M0 8 L12 8 M8 4 L12 8 L8 12" stroke="currentColor" strokeWidth="2" fill="none" />
-                              </svg>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        {unconnected.length > 0 && (
-          <div className="pt-4 border-t border-gray-200">
-            <p className="text-xs text-amber-600 mb-2">Unconnected species (add mutation links to include):</p>
-            <div className="flex flex-wrap gap-2">
-              {unconnected.map(spec => (
-                <div key={spec.id} className="flex items-center gap-1.5 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
-                  <div
-                    className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                    style={{ backgroundColor: spec.color }}
-                  >
-                    {spec.name.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="text-xs text-amber-700">{spec.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
+  const unconnectedSpecies = species.filter(s => speciesGenerations[s.id] === -1);
 
   return (
     <section className="space-y-4">
@@ -1438,270 +1673,66 @@ function CustomMutationTreeSection() {
             Design Your Own Mutation Tree
           </h2>
           <p className="text-violet-100 text-sm">
-            Create custom species with different rates and define mutation paths
+            Drag to connect species and create mutation paths. Click nodes to edit.
           </p>
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Species Editor */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-gray-700">Species</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={loadPreset}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                >
-                  Load Default
-                </button>
-                <button
-                  onClick={addSpecies}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors"
-                >
-                  + Add Species
-                </button>
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              {species.map((s, idx) => (
-                <div
-                  key={s.id}
-                  className="bg-gray-50 rounded-xl p-3 border border-gray-200"
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div
-                      className="w-6 h-6 rounded-full border-2 border-white shadow cursor-pointer"
-                      style={{ backgroundColor: s.color }}
-                      onClick={() => setEditingSpecies(editingSpecies === s.id ? null : s.id)}
-                    />
-                    <input
-                      type="text"
-                      value={s.name}
-                      onChange={e => updateSpecies(s.id, { name: e.target.value })}
-                      className="bg-white text-gray-800 text-sm px-2 py-1 rounded border border-gray-300 w-24"
-                    />
-                    <span className="text-xs text-gray-500">
-                      {idx === 0 ? "(Root - Gen 0, B=1)" : `(Gen ${speciesGenerations[s.id] === -1 ? '?' : speciesGenerations[s.id]}, B=0)`}
-                    </span>
-                    {idx !== 0 && (
-                      <button
-                        onClick={() => removeSpecies(s.id)}
-                        className="ml-auto text-gray-400 hover:text-red-500 text-sm"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                  
-                  {editingSpecies === s.id && (
-                    <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
-                      <div className="flex flex-wrap gap-2">
-                        {COLOR_PALETTE.map(color => (
-                          <button
-                            key={color}
-                            onClick={() => updateSpecies(s.id, { color })}
-                            className={`w-6 h-6 rounded-full border-2 ${s.color === color ? 'border-gray-800' : 'border-gray-300'}`}
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-3 mt-2">
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">
-                        Death Rate (D): {(s.deathRate * 100).toFixed(0)}%
-                      </label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="30"
-                        value={s.deathRate * 100}
-                        onChange={e => updateSpecies(s.id, { deathRate: parseInt(e.target.value) / 100 })}
-                        className="w-full accent-red-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">
-                        Replication Rate (R): {(s.replicationRate * 100).toFixed(0)}%
-                      </label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="30"
-                        value={s.replicationRate * 100}
-                        onChange={e => updateSpecies(s.id, { replicationRate: parseInt(e.target.value) / 100 })}
-                        className="w-full accent-green-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-4 mt-2 text-xs">
-                    <span className={`${s.replicationRate > s.deathRate ? 'text-green-600' : s.replicationRate < s.deathRate ? 'text-red-600' : 'text-gray-500'}`}>
-                      R - D = {((s.replicationRate - s.deathRate) * 100).toFixed(0)}%
-                      {s.replicationRate > s.deathRate ? ' (Growing)' : s.replicationRate < s.deathRate ? ' (Declining)' : ' (Stable)'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Mutation Tree Visualization */}
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold text-gray-700">Mutation Tree</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">Mutation Tree Editor</p>
+            <div className="flex gap-2">
               <button
-                onClick={() => setAddingMutation(true)}
-                className="text-xs px-3 py-1.5 rounded-lg bg-pink-500 text-white hover:bg-pink-600 transition-colors"
+                onClick={loadPreset}
+                className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
               >
-                + Add Link
+                Load Default
+              </button>
+              <button
+                onClick={addSpecies}
+                className="text-xs px-3 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors"
+              >
+                + Add Species
               </button>
             </div>
-            
-            {addingMutation && (
-              <div className="bg-white rounded-xl p-3 border border-pink-200 mb-4 space-y-3">
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">From (Gen {speciesGenerations[newMutationFrom] ?? "?"})</label>
-                    <select
-                      value={newMutationFrom}
-                      onChange={e => { setNewMutationFrom(e.target.value); setNewMutationTo(""); }}
-                      className="w-full bg-white text-gray-800 text-sm px-2 py-1.5 rounded border border-gray-300"
-                    >
-                      <option value="">Select...</option>
-                      {species.filter(s => speciesGenerations[s.id] >= 0).map(s => (
-                        <option key={s.id} value={s.id}>{s.name} (Gen {speciesGenerations[s.id]})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">To (must be forward gen)</label>
-                    <select
-                      value={newMutationTo}
-                      onChange={e => setNewMutationTo(e.target.value)}
-                      className={`w-full bg-white text-gray-800 text-sm px-2 py-1.5 rounded border ${linkError ? 'border-red-300' : 'border-gray-300'}`}
-                    >
-                      <option value="">Select...</option>
-                      {species
-                        .filter(s => s.id !== newMutationFrom)
-                        .map(s => {
-                          const validation = canLinkSpecies(newMutationFrom, s.id);
-                          const gen = speciesGenerations[s.id];
-                          const genLabel = gen === -1 ? "unconnected" : `Gen ${gen}`;
-                          return (
-                            <option 
-                              key={s.id} 
-                              value={s.id}
-                              disabled={!validation.valid}
-                            >
-                              {s.name} ({genLabel}){!validation.valid ? " ✗" : ""}
-                            </option>
-                          );
-                        })}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Chance %</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="50"
-                      value={newMutationChance * 100}
-                      onChange={e => setNewMutationChance(parseInt(e.target.value) / 100)}
-                      className="w-full bg-white text-gray-800 text-sm px-2 py-1.5 rounded border border-gray-300"
-                    />
-                  </div>
-                </div>
-                {linkError && (
-                  <p className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">{linkError}</p>
-                )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={addMutation}
-                    disabled={!!linkError || !newMutationFrom || !newMutationTo}
-                    className={`text-xs px-3 py-1.5 rounded-lg ${
-                      linkError || !newMutationFrom || !newMutationTo
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        : 'bg-pink-500 text-white hover:bg-pink-600'
-                    }`}
-                  >
-                    Add
-                  </button>
-                  <button
-                    onClick={() => { setAddingMutation(false); setLinkError(""); setNewMutationFrom(""); setNewMutationTo(""); }}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400">
-                  Note: Mutations can only link forward (e.g., Gen 0 → Gen 1 → Gen 2). You cannot create cycles or link backwards.
-                </p>
-              </div>
-            )}
-
-            <div className="flex items-center justify-center py-4 overflow-x-auto">
-              {mutations.length === 0 && species.length > 0 ? (
-                <div className="text-center">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md"
-                      style={{ backgroundColor: species[0].color }}
-                    >
-                      {species[0].name.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="text-xs text-gray-500 mt-1">{species[0].name}</span>
-                  </div>
-                  <p className="text-gray-400 text-xs mt-3">Add mutation links to build the tree</p>
-                </div>
-              ) : (
-                buildMutationTree()
-              )}
-            </div>
-
-            {/* Mutation Links List (for editing) */}
-            {mutations.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <p className="text-xs text-gray-500 mb-2">Edit Links:</p>
-                <div className="space-y-1">
-                  {mutations.map(m => {
-                    const fromSpec = species.find(s => s.id === m.from);
-                    const toSpec = species.find(s => s.id === m.to);
-                    if (!fromSpec || !toSpec) return null;
-                    return (
-                      <div key={`${m.from}-${m.to}`} className="flex items-center gap-2 text-sm">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: fromSpec.color }} />
-                        <span className="text-gray-600">{fromSpec.name}</span>
-                        <span className="text-gray-400">→</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="50"
-                          value={m.chance * 100}
-                          onChange={e => updateMutationChance(m.from, m.to, parseInt(e.target.value) / 100)}
-                          className="w-12 bg-white text-pink-600 text-xs px-1 py-0.5 rounded border border-gray-300 text-center"
-                        />
-                        <span className="text-gray-400">% →</span>
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: toSpec.color }} />
-                        <span className="text-gray-600">{toSpec.name}</span>
-                        <button
-                          onClick={() => removeMutation(m.from, m.to)}
-                          className="ml-auto text-gray-400 hover:text-red-500"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Simulation */}
+          <div className="h-80 bg-gradient-to-br from-slate-50 to-gray-100 rounded-xl border border-gray-200 overflow-hidden">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              fitView
+              proOptions={{ hideAttribution: true }}
+              defaultEdgeOptions={{
+                type: 'mutation',
+                markerEnd: {
+                  type: MarkerType.ArrowClosed,
+                  color: '#ec4899',
+                },
+              }}
+              connectionLineStyle={{ stroke: '#ec4899', strokeWidth: 2 }}
+              className="bg-transparent"
+            >
+              <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur rounded-lg px-3 py-2 text-xs text-gray-500 shadow-sm border border-gray-100">
+                <span className="font-medium">Tip:</span> Drag from right handle → left handle to connect
+              </div>
+            </ReactFlow>
+          </div>
+
+          {unconnectedSpecies.length > 0 && (
+            <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+              <p className="text-xs text-amber-700">
+                <span className="font-medium">Unconnected species:</span>{' '}
+                {unconnectedSpecies.map(s => s.name).join(', ')}
+                {' '}— drag a connection from an existing species to include them in the tree.
+              </p>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <canvas
@@ -1757,7 +1788,6 @@ function CustomMutationTreeSection() {
             </div>
           </div>
 
-          {/* Controls */}
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">Speed:</span>
@@ -1804,12 +1834,19 @@ function CustomMutationTreeSection() {
 // SECTION 7: FREE EVOLUTION SANDBOX
 // ============================================================================
 
+interface ExtinctLineage {
+  r: number;
+  d: number;
+  extinctAt: number;
+}
+
 function FreeEvolutionSection() {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [speed, setSpeed] = useState(60);
   const [tick, setTick] = useState(0);
   
+  const [birthRate, setBirthRate] = useState(0.5);
   const [mutationRate, setMutationRate] = useState(0.15);
   const [mutationImpact, setMutationImpact] = useState(0.02);
   const [startingR, setStartingR] = useState(0.05);
@@ -1820,6 +1857,7 @@ function FreeEvolutionSection() {
   const nextIdRef = useRef(0);
   const nextLineageRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previousLineagesRef = useRef<Set<number>>(new Set());
   
   const [stats, setStats] = useState({
     total: 0,
@@ -1828,10 +1866,17 @@ function FreeEvolutionSection() {
     avgD: 0,
     fittestR: 0,
     fittestD: 0,
+    baseCount: 0,
   });
+  
+  const [extinctLineages, setExtinctLineages] = useState<ExtinctLineage[]>([]);
+  const lineageDataRef = useRef<Record<number, { r: number; d: number }>>({});
 
   const MAX_POPULATION = 1500;
   const SANDBOX_CANVAS = 400;
+  const BASE_LINEAGE_ID = 0;
+  const EXTINCT_FADE_TICKS = 50;
+  const MAX_EXTINCT_DISPLAY = 8;
 
   const getFitnessColor = (r: number, d: number): string => {
     const fitness = (r - d) * 10;
@@ -1843,12 +1888,15 @@ function FreeEvolutionSection() {
 
   const reset = useCallback(() => {
     entitiesRef.current = [];
-    setStats({ total: 0, lineages: 0, avgR: 0, avgD: 0, fittestR: 0, fittestD: 0 });
+    setStats({ total: 0, lineages: 0, avgR: 0, avgD: 0, fittestR: 0, fittestD: 0, baseCount: 0 });
     setTick(0);
     setIsPaused(false);
     setIsRunning(false);
+    setExtinctLineages([]);
     nextIdRef.current = 0;
-    nextLineageRef.current = 0;
+    nextLineageRef.current = 1;
+    previousLineagesRef.current = new Set();
+    lineageDataRef.current = {};
   }, []);
 
   useEffect(() => {
@@ -1856,26 +1904,30 @@ function FreeEvolutionSection() {
 
     const interval = setInterval(() => {
       const entities = entitiesRef.current;
+      const currentTick = tick + 1;
       
       if (entities.length >= MAX_POPULATION) {
         setIsPaused(true);
         return;
       }
 
-      setTick(t => t + 1);
+      setTick(currentTick);
 
       const toAdd: EvolvingEntity[] = [];
 
-      if (entities.length === 0) {
+      if (Math.random() < birthRate) {
         toAdd.push({
           id: nextIdRef.current++,
-          x: SANDBOX_CANVAS / 2,
-          y: SANDBOX_CANVAS / 2,
+          x: Math.random() * SANDBOX_CANVAS,
+          y: Math.random() * SANDBOX_CANVAS,
           replicationRate: startingR,
           deathRate: startingD,
           generation: 0,
-          lineageId: nextLineageRef.current++,
+          lineageId: BASE_LINEAGE_ID,
         });
+        if (!lineageDataRef.current[BASE_LINEAGE_ID]) {
+          lineageDataRef.current[BASE_LINEAGE_ID] = { r: startingR, d: startingD };
+        }
       }
 
       const surviving = entities.filter(e => {
@@ -1888,6 +1940,7 @@ function FreeEvolutionSection() {
             offspringR = Math.max(0.01, Math.min(0.30, offspringR + (Math.random() - 0.5) * 2 * mutationImpact));
             offspringD = Math.max(0.01, Math.min(0.30, offspringD + (Math.random() - 0.5) * 2 * mutationImpact));
             offspringLineage = nextLineageRef.current++;
+            lineageDataRef.current[offspringLineage] = { r: offspringR, d: offspringD };
           }
 
           toAdd.push({
@@ -1907,10 +1960,38 @@ function FreeEvolutionSection() {
       entitiesRef.current = [...surviving, ...toAdd];
 
       const all = entitiesRef.current;
+      const currentLineages = new Set(all.map(e => e.lineageId));
+      
+      const newExtinct: ExtinctLineage[] = [];
+      previousLineagesRef.current.forEach(lineageId => {
+        if (!currentLineages.has(lineageId) && lineageId !== BASE_LINEAGE_ID) {
+          const data = lineageDataRef.current[lineageId];
+          if (data) {
+            newExtinct.push({ r: data.r, d: data.d, extinctAt: currentTick });
+          }
+        }
+      });
+      
+      if (newExtinct.length > 0) {
+        setExtinctLineages(prev => {
+          const updated = [...prev, ...newExtinct]
+            .filter(e => currentTick - e.extinctAt < EXTINCT_FADE_TICKS)
+            .slice(-20);
+          return updated;
+        });
+      } else {
+        setExtinctLineages(prev => 
+          prev.filter(e => currentTick - e.extinctAt < EXTINCT_FADE_TICKS)
+        );
+      }
+      
+      previousLineagesRef.current = currentLineages;
+
       if (all.length > 0) {
         const lineageSet = new Set(all.map(e => e.lineageId));
         const avgR = all.reduce((sum, e) => sum + e.replicationRate, 0) / all.length;
         const avgD = all.reduce((sum, e) => sum + e.deathRate, 0) / all.length;
+        const baseCount = all.filter(e => e.lineageId === BASE_LINEAGE_ID).length;
         
         let fittest = all[0];
         all.forEach(e => {
@@ -1926,14 +2007,15 @@ function FreeEvolutionSection() {
           avgD,
           fittestR: fittest.replicationRate,
           fittestD: fittest.deathRate,
+          baseCount,
         });
       } else {
-        setStats({ total: 0, lineages: 0, avgR: 0, avgD: 0, fittestR: 0, fittestD: 0 });
+        setStats({ total: 0, lineages: 0, avgR: 0, avgD: 0, fittestR: 0, fittestD: 0, baseCount: 0 });
       }
     }, speed);
 
     return () => clearInterval(interval);
-  }, [isRunning, isPaused, speed, mutationRate, mutationImpact, startingR, startingD]);
+  }, [isRunning, isPaused, speed, birthRate, mutationRate, mutationImpact, startingR, startingD, tick]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1963,7 +2045,8 @@ function FreeEvolutionSection() {
     });
 
     entitiesRef.current.forEach(e => {
-      if (lineageCounts[e.lineageId] < visibilityThreshold) return;
+      const isBaseSpecies = e.lineageId === BASE_LINEAGE_ID;
+      if (!isBaseSpecies && lineageCounts[e.lineageId] < visibilityThreshold) return;
       
       const fitness = e.replicationRate - e.deathRate;
       const size = fitness > 0 ? 4 + fitness * 20 : Math.max(2, 4 + fitness * 20);
@@ -1993,6 +2076,85 @@ function FreeEvolutionSection() {
         </div>
 
         <div className="p-6 space-y-6">
+          {/* Base Species Display & Controls */}
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md"
+                style={{ backgroundColor: getFitnessColor(startingR, startingD) }}
+              >
+                B
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Base Species</p>
+                <p className="text-xs text-gray-500">The only species with spontaneous birth. Must be stable or declining.</p>
+              </div>
+              <div className="ml-auto text-right">
+                <div className="text-sm">
+                  <span className="text-blue-600 font-medium">Pop: {stats.baseCount}</span>
+                </div>
+                <span className={`text-xs ${startingR < startingD ? 'text-amber-600' : 'text-gray-500'}`}>
+                  Net: {((startingR - startingD) * 100).toFixed(0)}% ({startingR < startingD ? 'Declining' : 'Stable'})
+                </span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">
+                  Birth Rate (B): {(birthRate * 100).toFixed(0)}%
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  value={birthRate * 100}
+                  onChange={e => setBirthRate(parseInt(e.target.value) / 100)}
+                  className="w-full accent-blue-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-emerald-200"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">
+                  Replication (R): {(startingR * 100).toFixed(0)}%
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="20"
+                  value={startingR * 100}
+                  onChange={e => {
+                    const newR = parseInt(e.target.value) / 100;
+                    setStartingR(newR);
+                    if (newR > startingD) {
+                      setStartingD(newR);
+                    }
+                  }}
+                  className="w-full accent-green-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-emerald-200"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">
+                  Death (D): {(startingD * 100).toFixed(0)}%
+                </label>
+                <input
+                  type="range"
+                  min={startingR * 100}
+                  max="30"
+                  value={startingD * 100}
+                  onChange={e => setStartingD(parseInt(e.target.value) / 100)}
+                  className="w-full accent-red-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-emerald-200"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">D must be ≥ R (base species cannot have exponential growth)</p>
+          </div>
+
+          <p className="text-xs text-gray-400 leading-relaxed">
+            While chance still plays a role in every run, certain parameters affect how quickly an exponential 
+            species can take over. Experiment to test how many ticks (time passed) until the simulation 
+            population limit is reached.
+          </p>
+
           {/* Controls */}
           <div className="grid md:grid-cols-2 gap-4">
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-4">
@@ -2026,35 +2188,6 @@ function FreeEvolutionSection() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">
-                    Starting R: {(startingR * 100).toFixed(0)}%
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    value={startingR * 100}
-                    onChange={e => setStartingR(parseInt(e.target.value) / 100)}
-                    className="w-full accent-green-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">
-                    Starting D: {(startingD * 100).toFixed(0)}%
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    value={startingD * 100}
-                    onChange={e => setStartingD(parseInt(e.target.value) / 100)}
-                    className="w-full accent-red-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="text-xs text-gray-500 block mb-1">
                   Visibility Threshold: {visibilityThreshold} individuals
@@ -2074,7 +2207,12 @@ function FreeEvolutionSection() {
             </div>
 
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-3">
-              <p className="text-sm font-semibold text-gray-700">Statistics</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-700">Statistics</p>
+                <span className="text-xs font-mono bg-gray-200 px-2 py-0.5 rounded text-gray-600">
+                  Tick: {tick}
+                </span>
+              </div>
               
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
@@ -2096,7 +2234,7 @@ function FreeEvolutionSection() {
               </div>
 
               <div className="pt-3 border-t border-gray-200">
-                <p className="text-xs text-gray-500 mb-1">Fittest Individual</p>
+                <p className="text-xs text-gray-500 mb-1">Fittest Individual (current)</p>
                 <div className="flex items-center gap-3">
                   <div
                     className="w-6 h-6 rounded-full shadow"
@@ -2126,6 +2264,39 @@ function FreeEvolutionSection() {
               </div>
             </div>
           </div>
+
+          {/* Extinct Lineages */}
+          {extinctLineages.length > 0 && (
+            <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+              <p className="text-xs text-gray-500 mb-2">Recently Extinct Mutations</p>
+              <div className="flex flex-wrap gap-1.5">
+                {extinctLineages.slice(-MAX_EXTINCT_DISPLAY).map((extinct, idx) => {
+                  const age = tick - extinct.extinctAt;
+                  const opacity = Math.max(0.2, 1 - (age / EXTINCT_FADE_TICKS));
+                  return (
+                    <div
+                      key={`extinct-${idx}-${extinct.extinctAt}`}
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-gray-200"
+                      style={{ opacity }}
+                    >
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: getFitnessColor(extinct.r, extinct.d) }}
+                      />
+                      <span className="text-xs text-gray-500">
+                        {((extinct.r - extinct.d) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  );
+                })}
+                {extinctLineages.length > MAX_EXTINCT_DISPLAY && (
+                  <span className="text-xs text-gray-400 self-center">
+                    +{extinctLineages.length - MAX_EXTINCT_DISPLAY} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Canvas */}
           <div className="flex justify-center">
