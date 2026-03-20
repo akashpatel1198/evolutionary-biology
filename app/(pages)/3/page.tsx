@@ -2518,12 +2518,12 @@ export default function Page3() {
         <KeyInsightSection />
 
         {/* Sandbox Section Divider */}
-        <div className="relative py-8">
+        <div className="relative py-10">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-300"></div>
+            <div className="w-full border-t-2 border-dashed border-indigo-300"></div>
           </div>
           <div className="relative flex justify-center">
-            <span className="bg-gradient-to-b from-purple-50 via-white to-indigo-50 px-4 text-sm text-slate-500 font-medium">
+            <span className="bg-white px-6 py-2 text-sm text-indigo-600 font-semibold rounded-full border-2 border-indigo-300 shadow-sm">
               Sandbox Mode
             </span>
           </div>

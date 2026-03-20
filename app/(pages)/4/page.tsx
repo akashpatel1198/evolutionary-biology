@@ -280,16 +280,17 @@ function ExponentialGrowthSection() {
           </div>
 
           {/* Bonus Section - Derivative Explanation for Exponential */}
-          <div className="border border-amber-200 rounded-xl overflow-hidden">
+          <div className="border border-purple-200 rounded-xl overflow-hidden">
             <button
               onClick={() => setShowExpBonus(!showExpBonus)}
-              className="w-full px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-colors flex items-center justify-between"
+              className="w-full px-4 py-3 bg-purple-50 hover:bg-purple-100 transition-colors flex items-center justify-between"
             >
-              <span className="text-sm font-semibold text-amber-700">
+              <span className="text-sm font-semibold text-purple-700">
                 Bonus: The Derivative Perspective
+                <span className="text-sm text-purple-400 ml-2 font-normal italic">*charts wonky, working on fix</span>
               </span>
               <svg
-                className={`w-5 h-5 text-amber-500 transition-transform ${showExpBonus ? 'rotate-180' : ''}`}
+                className={`w-5 h-5 text-purple-500 transition-transform ${showExpBonus ? 'rotate-180' : ''}`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -611,6 +612,7 @@ function CrowdingSection() {
                 >
                   <span className="text-sm font-semibold text-purple-700">
                     Bonus: The Derivative Perspective
+                    <span className="text-sm text-purple-400 ml-2 font-normal italic">*charts wonky, working on fix</span>
                   </span>
                   <svg
                     className={`w-5 h-5 text-purple-500 transition-transform ${showBonus ? 'rotate-180' : ''}`}
@@ -1125,7 +1127,7 @@ function CompetitionSection() {
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [tick, setTick] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const [C, setC] = useState(0.001);
+  const [K, setK] = useState(100);
   const [mutationRate, setMutationRate] = useState(0.01);
 
   const entitiesRef = useRef<Entity[]>([]);
@@ -1137,8 +1139,11 @@ function CompetitionSection() {
     orange: { color: "#f97316", R: 0.1, D: 0.03 },
   };
 
+  // C is derived from K using blue's R-D as reference
+  const C = (CREATURES.blue.R - CREATURES.blue.D) / K;
+
   const carryingCapacities = {
-    blue: C > 0 ? (CREATURES.blue.R - CREATURES.blue.D) / C : Infinity,
+    blue: K,
     green: C > 0 ? (CREATURES.green.R - CREATURES.green.D) / C : Infinity,
     orange: C > 0 ? (CREATURES.orange.R - CREATURES.orange.D) / C : Infinity,
   };
@@ -1209,7 +1214,7 @@ function CompetitionSection() {
     }, 50);
 
     return () => clearInterval(interval);
-  }, [isRunning, C, mutationRate]);
+  }, [isRunning, C, mutationRate, K]);
 
   useEffect(() => {
     if (tick === 0) return;
@@ -1331,21 +1336,23 @@ function CompetitionSection() {
             </div>
             <div className="space-y-2">
               <label className="flex justify-between text-sm font-medium text-gray-700">
-                <span>Crowding Coefficient (C)</span>
+                <span>Carrying Capacity (K)</span>
                 <span className="font-mono text-orange-600 bg-orange-50 px-2 py-0.5 rounded text-xs">
-                  {C.toFixed(4)}
+                  {K}
                 </span>
               </label>
               <input
                 type="range"
-                min="0.0005"
-                max="0.003"
-                step="0.0001"
-                value={C}
-                onChange={(e) => setC(parseFloat(e.target.value))}
+                min="20"
+                max="500"
+                step="10"
+                value={K}
+                onChange={(e) => setK(parseFloat(e.target.value))}
                 className="w-full accent-orange-500 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200"
               />
-              <p className="text-xs text-gray-500">Higher C = more death from crowding = lower K</p>
+              <p className="text-xs text-gray-500">
+                C = {C.toFixed(5)} (derived from K)
+              </p>
             </div>
           </div>
 
@@ -1496,31 +1503,31 @@ function KeyInsightSection() {
             </div>
             <div>
               <h2 className="text-white font-bold text-xl mb-3">
-                The Core of Evolution
+                Key Insight
               </h2>
               <p className="text-emerald-100 text-lg leading-relaxed">
-                We&apos;ve now covered the three pillars:
+                We&apos;ve now covered the three pillars of evolution:
               </p>
             </div>
           </div>
 
           <div className="grid md:grid-cols-3 gap-4">
             <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
-              <p className="text-2xl mb-2">🔄</p>
+              <p className="text-2xl font-bold text-white mb-2">1</p>
               <p className="font-semibold text-white">Replication</p>
               <p className="text-emerald-200 text-sm mt-1">
                 Populations can grow
               </p>
             </div>
             <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
-              <p className="text-2xl mb-2">🎲</p>
+              <p className="text-2xl font-bold text-white mb-2">2</p>
               <p className="font-semibold text-white">Mutation</p>
               <p className="text-emerald-200 text-sm mt-1">
                 Diversity appears
               </p>
             </div>
             <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
-              <p className="text-2xl mb-2">⚔️</p>
+              <p className="text-2xl font-bold text-white mb-2">3</p>
               <p className="font-semibold text-white">Competition</p>
               <p className="text-emerald-200 text-sm mt-1">
                 Finite resources select for fittest
@@ -1546,6 +1553,509 @@ function KeyInsightSection() {
                 selection happen a bit more naturally.
               </p>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// SECTION 7: COMPETITION SANDBOX
+// ============================================================================
+
+const SANDBOX_COLORS = ["#3b82f6", "#22c55e", "#f97316", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f59e0b"];
+const SANDBOX_COLOR_NAMES = ["Blue", "Green", "Orange", "Red", "Purple", "Pink", "Teal", "Amber"];
+const MAX_SANDBOX_SPECIES = 8;
+
+interface SandboxSpecies {
+  id: string;
+  name: string;
+  color: string;
+  R: number;
+  D: number;
+  startingPop: number;
+}
+
+interface SandboxHistoryPoint {
+  tick: number;
+  [key: string]: number;
+}
+
+interface ExtinctionEvent {
+  tick: number;
+  speciesId: string;
+  speciesName: string;
+  color: string;
+}
+
+function CompetitionSandboxSection() {
+  const [species, setSpecies] = useState<SandboxSpecies[]>([
+    { id: "sp-0", name: "Blue", color: SANDBOX_COLORS[0], R: 0.10, D: 0.05, startingPop: 20 },
+    { id: "sp-1", name: "Green", color: SANDBOX_COLORS[1], R: 0.08, D: 0.04, startingPop: 20 },
+  ]);
+  const [populations, setPopulations] = useState<{ [speciesId: string]: number }>({});
+  const [history, setHistory] = useState<SandboxHistoryPoint[]>([]);
+  const [tick, setTick] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
+  const [C, setC] = useState(0.0005);
+  const [extinctions, setExtinctions] = useState<ExtinctionEvent[]>([]);
+  const prevPopulationsRef = useRef<{ [speciesId: string]: number }>({});
+
+  const addSpecies = useCallback(() => {
+    if (species.length >= MAX_SANDBOX_SPECIES) return;
+    const idx = species.length;
+    setSpecies((prev) => [
+      ...prev,
+      {
+        id: `sp-${Date.now()}`,
+        name: SANDBOX_COLOR_NAMES[idx % SANDBOX_COLOR_NAMES.length],
+        color: SANDBOX_COLORS[idx % SANDBOX_COLORS.length],
+        R: 0.08 + Math.random() * 0.04,
+        D: 0.03 + Math.random() * 0.03,
+        startingPop: 20,
+      },
+    ]);
+  }, [species.length]);
+
+  const removeSpecies = useCallback((id: string) => {
+    setSpecies((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
+  const updateSpecies = useCallback((id: string, updates: Partial<SandboxSpecies>) => {
+    setSpecies((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
+    );
+  }, []);
+
+  const reset = useCallback(() => {
+    const initialPops: { [speciesId: string]: number } = {};
+    species.forEach((s) => {
+      initialPops[s.id] = s.startingPop;
+    });
+    setPopulations(initialPops);
+    prevPopulationsRef.current = { ...initialPops };
+    setHistory([]);
+    setTick(0);
+    setExtinctions([]);
+  }, [species]);
+
+  const randomizeSpecies = useCallback((type: 'random' | 'balanced' | 'underdog') => {
+    if (type === 'random') {
+      setSpecies((prev) =>
+        prev.map((s) => ({
+          ...s,
+          R: 0.05 + Math.random() * 0.1,
+          D: 0.02 + Math.random() * 0.06,
+        }))
+      );
+    } else if (type === 'balanced') {
+      const baseR = 0.08;
+      const baseD = 0.04;
+      setSpecies((prev) =>
+        prev.map((s) => ({
+          ...s,
+          R: baseR + (Math.random() - 0.5) * 0.01,
+          D: baseD + (Math.random() - 0.5) * 0.01,
+        }))
+      );
+    } else if (type === 'underdog') {
+      setSpecies((prev) =>
+        prev.map((s, i) => ({
+          ...s,
+          R: i === 0 ? 0.06 : 0.10,
+          D: i === 0 ? 0.05 : 0.04,
+          startingPop: i === 0 ? 50 : 10,
+        }))
+      );
+    }
+  }, []);
+
+  // Initialize populations on mount or species change
+  useEffect(() => {
+    reset();
+  }, [reset]);
+
+  // Simulation loop
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const interval = setInterval(() => {
+      setTick((t) => t + 1);
+
+      setPopulations((prevPops) => {
+        const newPops = { ...prevPops };
+        const totalN = Object.values(newPops).reduce((sum, n) => sum + n, 0);
+
+        species.forEach((sp) => {
+          const pop = newPops[sp.id] || 0;
+          if (pop <= 0) {
+            newPops[sp.id] = 0;
+            return;
+          }
+
+          const effectiveD = sp.D + C * totalN;
+          const replications = binomialSample(pop, sp.R);
+          const deaths = binomialSample(pop, Math.min(effectiveD, 1));
+          newPops[sp.id] = Math.max(0, pop + replications - deaths);
+        });
+
+        return newPops;
+      });
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, [isRunning, species, C]);
+
+  // Record history and detect extinctions
+  useEffect(() => {
+    if (tick === 0) return;
+    
+    // Check for extinctions
+    species.forEach((sp) => {
+      const prevPop = prevPopulationsRef.current[sp.id] || 0;
+      const currentPop = populations[sp.id] || 0;
+      if (prevPop > 0 && currentPop === 0) {
+        setExtinctions((prev) => [
+          ...prev,
+          { tick, speciesId: sp.id, speciesName: sp.name, color: sp.color }
+        ]);
+      }
+    });
+    prevPopulationsRef.current = { ...populations };
+
+    setHistory((prev) => {
+      const newPoint: SandboxHistoryPoint = { tick };
+      species.forEach((sp) => {
+        newPoint[sp.id] = populations[sp.id] || 0;
+      });
+      const newHistory = [...prev, newPoint];
+      return newHistory.length > 400 ? newHistory.slice(-400) : newHistory;
+    });
+  }, [tick, populations, species]);
+
+  const totalPop = Object.values(populations).reduce((sum, n) => sum + n, 0);
+
+  // Get max K across species for chart scaling
+  const maxSpeciesK = Math.max(...species.map(sp => {
+    const netGrowth = sp.R - sp.D;
+    return C > 0 && netGrowth > 0 ? netGrowth / C : 100;
+  }));
+
+  return (
+    <section className="space-y-4">
+      <div className="bg-white rounded-2xl shadow-lg shadow-indigo-100/50 border border-indigo-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4">
+          <h2 className="text-white font-semibold text-lg">
+            Competition Sandbox
+          </h2>
+          <p className="text-indigo-100 text-sm">
+            Create species, set their fitness, and watch them compete for limited resources
+          </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Context Card */}
+          <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-200">
+            <p className="text-sm text-indigo-700 mb-2">
+              <strong>How it works:</strong> Each species has a replication rate (R) and base death rate (D). 
+              There are no spontaneous births (B=0) — populations grow only through replication.
+            </p>
+            <p className="text-sm text-indigo-600">
+              All species share the same crowding coefficient (C), meaning they compete for identical resources. 
+              The effective death rate for each individual is <span className="font-mono bg-indigo-100 px-1 rounded">D + C × total_population</span>.
+            </p>
+          </div>
+
+          {/* Species List */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-gray-800">Species</h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => randomizeSpecies('random')}
+                  className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                >
+                  Random
+                </button>
+                <button
+                  onClick={() => randomizeSpecies('balanced')}
+                  className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-600 hover:bg-blue-200"
+                >
+                  Balanced
+                </button>
+                <button
+                  onClick={() => randomizeSpecies('underdog')}
+                  className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-600 hover:bg-orange-200"
+                >
+                  Underdog
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              {species.map((sp) => {
+                const netGrowth = sp.R - sp.D;
+                const speciesK = C > 0 && netGrowth > 0 ? netGrowth / C : 0;
+                const currentPop = populations[sp.id] || 0;
+                const glowClass = netGrowth > 0.001 
+                  ? "border-green-300 shadow-sm shadow-green-200/60" 
+                  : netGrowth < -0.001 
+                  ? "border-red-300 shadow-sm shadow-red-200/60" 
+                  : "border-orange-300 shadow-sm shadow-orange-200/60";
+
+                return (
+                  <div key={sp.id} className={`bg-gray-50 rounded-xl p-3 border ${glowClass}`}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div
+                        className="w-6 h-6 rounded-full flex-shrink-0 cursor-pointer hover:scale-110 transition-transform"
+                        style={{ backgroundColor: sp.color }}
+                        onClick={() => {
+                          const currentIdx = SANDBOX_COLORS.indexOf(sp.color);
+                          const nextIdx = (currentIdx + 1) % SANDBOX_COLORS.length;
+                          updateSpecies(sp.id, { 
+                            color: SANDBOX_COLORS[nextIdx],
+                            name: SANDBOX_COLOR_NAMES[nextIdx]
+                          });
+                        }}
+                      />
+                      <input
+                        type="text"
+                        value={sp.name}
+                        onChange={(e) => updateSpecies(sp.id, { name: e.target.value })}
+                        className="text-sm font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-indigo-400 focus:outline-none w-24"
+                      />
+                      <span className={`text-xs font-mono px-2 py-0.5 rounded ${
+                        netGrowth > 0 ? 'bg-green-100 text-green-700' : 
+                        netGrowth < 0 ? 'bg-red-100 text-red-700' : 
+                        'bg-orange-100 text-orange-700'
+                      }`}>
+                        R-D = {(netGrowth * 100).toFixed(1)}%
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        K≈{speciesK > 0 && speciesK < 10000 ? Math.round(speciesK) : '—'}
+                      </span>
+                      <span className="text-xs font-mono text-gray-400 ml-auto mr-2">
+                        pop: {currentPop}
+                      </span>
+                      {species.length > 1 && (
+                        <button
+                          onClick={() => removeSpecies(sp.id)}
+                          className="text-gray-400 hover:text-red-500"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs text-gray-500 flex justify-between">
+                          <span>R (replication)</span>
+                          <span className="text-green-600">{(sp.R * 100).toFixed(0)}%</span>
+                        </label>
+                        <input
+                          type="range"
+                          min="0.01"
+                          max="0.2"
+                          step="0.01"
+                          value={sp.R}
+                          onChange={(e) => updateSpecies(sp.id, { R: parseFloat(e.target.value) })}
+                          className="w-full accent-green-500 h-1.5"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-gray-500 flex justify-between">
+                          <span>D (death)</span>
+                          <span className="text-red-600">{(sp.D * 100).toFixed(0)}%</span>
+                        </label>
+                        <input
+                          type="range"
+                          min="0.01"
+                          max="0.15"
+                          step="0.01"
+                          value={sp.D}
+                          onChange={(e) => updateSpecies(sp.id, { D: parseFloat(e.target.value) })}
+                          className="w-full accent-red-500 h-1.5"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-gray-500 flex justify-between">
+                          <span>Start pop</span>
+                          <span className="text-gray-600">{sp.startingPop}</span>
+                        </label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="100"
+                          step="1"
+                          value={sp.startingPop}
+                          onChange={(e) => updateSpecies(sp.id, { startingPop: parseInt(e.target.value) })}
+                          className="w-full accent-gray-500 h-1.5"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={addSpecies}
+              disabled={species.length >= MAX_SANDBOX_SPECIES}
+              className="w-full py-2 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              + Add Species
+            </button>
+          </div>
+
+          {/* Environment Controls */}
+          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+            <h3 className="font-medium text-gray-800 mb-3">Environment</h3>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="flex justify-between text-sm font-medium text-gray-700">
+                  <span>All Starting Populations</span>
+                  <span className="font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded text-xs">
+                    {species.length > 0 ? species[0].startingPop : 20}
+                  </span>
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value={species.length > 0 ? species[0].startingPop : 20}
+                  onChange={(e) => {
+                    const newPop = parseInt(e.target.value);
+                    setSpecies((prev) => prev.map((s) => ({ ...s, startingPop: newPop })));
+                  }}
+                  className="w-full accent-gray-500 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                />
+                <p className="text-xs text-gray-500">Sets starting population for all species (Can still adjust individually after)</p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="flex justify-between text-sm font-medium text-gray-700">
+                  <span>Crowding Coefficient (C)</span>
+                  <span className="font-mono text-orange-600 bg-orange-50 px-2 py-0.5 rounded text-xs">
+                    {C.toFixed(5)}
+                  </span>
+                </label>
+                <input
+                  type="range"
+                  min="0.0001"
+                  max="0.002"
+                  step="0.0001"
+                  value={C}
+                  onChange={(e) => setC(parseFloat(e.target.value))}
+                  className="w-full accent-orange-500 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                />
+                <p className="text-xs text-gray-500">
+                  Lower C = more resources = higher carrying capacities for all species
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Why K differs explanation */}
+          <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+            <p className="text-sm text-amber-700">
+              <strong>Why each species has different K:</strong> Carrying capacity K = (R - D) / C. 
+              Since all species share the same C (same resources), species with higher fitness (R - D) 
+              can sustain larger populations before crowding overwhelms them. 
+              The fittest species &quot;wins&quot; by having the highest K.
+            </p>
+          </div>
+
+          {/* Chart */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Population over time</span>
+              <span className="text-xs text-gray-500">
+                Total: {totalPop}
+              </span>
+            </div>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={history}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="tick" fontSize={10} hide />
+                <YAxis 
+                  fontSize={10} 
+                  width={40}
+                  domain={[0, (dataMax: number) => Math.max(dataMax * 1.1, maxSpeciesK * 1.1, 50)]}
+                />
+                <Tooltip formatter={(value) => [value as number, "Population"]} />
+                {extinctions.map((ext) => (
+                  <ReferenceLine
+                    key={`ext-${ext.speciesId}-${ext.tick}`}
+                    x={ext.tick}
+                    stroke={ext.color}
+                    strokeDasharray="3 3"
+                    strokeWidth={2}
+                    label={{
+                      value: `☠ ${ext.speciesName}`,
+                      fill: ext.color,
+                      fontSize: 9,
+                      position: "top",
+                    }}
+                  />
+                ))}
+                {species.map((sp) => (
+                  <Line
+                    key={sp.id}
+                    type="monotone"
+                    dataKey={sp.id}
+                    name={sp.name}
+                    stroke={sp.color}
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+            {/* Species population counts */}
+            <div className="flex flex-wrap gap-3 justify-center">
+              {species.map((sp) => (
+                <div key={sp.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5 border border-gray-200">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sp.color }} />
+                  <span className="text-sm text-gray-700">{sp.name}</span>
+                  <span className="text-sm font-mono font-medium" style={{ color: sp.color }}>
+                    {populations[sp.id] || 0}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsRunning(!isRunning)}
+              className={`px-5 py-2.5 rounded-xl font-semibold transition-all ${
+                isRunning
+                  ? "bg-amber-500 text-white"
+                  : "bg-indigo-500 text-white hover:bg-indigo-600"
+              }`}
+            >
+              {isRunning ? "Pause" : "Start"}
+            </button>
+            <button
+              onClick={reset}
+              className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold text-gray-700"
+            >
+              Reset
+            </button>
+          </div>
+
+          {/* Explanation */}
+          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+            <p className="text-sm text-gray-600">
+              <strong>Competitive Exclusion Principle:</strong> When species compete for identical resources, 
+              the one with the highest fitness (R - D) will eventually dominate and drive others to extinction. 
+              Try the &quot;Balanced&quot; preset to see how even tiny fitness differences determine the winner over time.
+            </p>
           </div>
         </div>
       </div>
@@ -1583,6 +2093,20 @@ export default function Page4() {
         <LogisticGrowthSection />
         <CompetitionSection />
         <KeyInsightSection />
+
+        {/* Sandbox Section Divider */}
+        <div className="relative py-10">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t-2 border-dashed border-indigo-300"></div>
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-white px-6 py-2 text-sm text-indigo-600 font-semibold rounded-full border-2 border-indigo-300 shadow-sm">
+              Sandbox Mode
+            </span>
+          </div>
+        </div>
+
+        <CompetitionSandboxSection />
 
         <div className="h-8"></div>
       </div>
