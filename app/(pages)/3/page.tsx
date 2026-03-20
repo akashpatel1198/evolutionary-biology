@@ -414,7 +414,7 @@ function MutationEquationSection() {
 
         <div className="p-6 space-y-6">
           <p className="text-gray-600">
-            Let&apos;s add mutations to our equations from the last video.
+            Let&apos;s add mutations to our equations from the last chapter.
             Mutation affects what happens when a creature replicates.
           </p>
 
