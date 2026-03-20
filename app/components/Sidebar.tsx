@@ -3,33 +3,39 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+const pages = [
+  { id: 1, title: "Why Do Things Exist?" },
+  { id: 2, title: "Exponential Growth" },
+  { id: 3, title: "Mutations" },
+  { id: 4, title: "Carrying Capacity" },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
-  const pages = Array.from({ length: 9 }, (_, i) => i + 1);
 
   return (
     <aside className="fixed top-0 left-0 w-64 h-screen bg-emerald-800 text-white p-6 flex flex-col overflow-y-auto">
       <Link
         href="/"
-        className="text-2xl font-bold mb-8 hover:text-emerald-200 transition-colors flex-shrink-0"
+        className="px-4 py-2 text-lg font-bold mb-8 bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors flex-shrink-0 text-center"
       >
-        Home
+        ← Home
       </Link>
 
       <nav className="flex flex-col gap-2 flex-1">
-        {pages.map((num) => {
-          const isActive = pathname === `/${num}`;
+        {pages.map((page) => {
+          const isActive = pathname === `/${page.id}`;
           return (
             <Link
-              key={num}
-              href={`/${num}`}
+              key={page.id}
+              href={`/${page.id}`}
               className={`px-4 py-3 rounded-lg transition-colors ${
                 isActive
                   ? "bg-emerald-600 text-white"
                   : "hover:bg-emerald-700 text-emerald-100"
               }`}
             >
-              Page {num}
+              <span className="font-bold">{page.id}.</span> {page.title}
             </Link>
           );
         })}

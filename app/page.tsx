@@ -20,9 +20,13 @@ export default function Home() {
           Evolutionary Biology
         </h1>
         
-        <p className="text-xl text-emerald-700 mb-12 leading-relaxed max-w-2xl mx-auto">
+        <p className="text-xl text-emerald-700 mb-6 leading-relaxed max-w-2xl mx-auto">
           Interactive simulations exploring the foundations of evolution.
-          Inspired by the <strong>Primer</strong> YouTube channel.
+          Inspired by the <a href="https://www.youtube.com/@PrimerBlobs/videos" target="_blank" rel="noopener noreferrer" className="font-bold hover:text-emerald-900 underline underline-offset-2">Primer</a> YouTube channel.
+        </p>
+
+        <p className="text-lg text-emerald-600 mb-12 leading-relaxed max-w-2xl mx-auto">
+          Each page is based on one of the videos from Primer. I highly recommend watching the corresponding video then exploring the simulations on each page, but each page can stand alone. The first two pages are relatively simple and quick reads, while later pages grow in complexity.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-3xl mx-auto">
