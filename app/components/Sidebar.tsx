@@ -8,6 +8,7 @@ const pages = [
   { id: 2, title: "Exponential Growth" },
   { id: 3, title: "Mutations" },
   { id: 4, title: "Carrying Capacity" },
+  { id: 5, title: "Natural Selection" },
 ];
 
 export default function Sidebar() {

@@ -5,7 +5,7 @@ const simulations = [
   { id: 2, title: "Exponential Growth", subtitle: "Replication Changes Everything", color: "emerald" },
   { id: 3, title: "Mutations", subtitle: "Heritable Variation", color: "blue" },
   { id: 4, title: "Carrying Capacity", subtitle: "Competition & Logistic Growth", color: "amber" },
-  { id: 5, title: "Natural Selection", subtitle: "Coming Soon", color: "gray", disabled: true },
+  { id: 5, title: "Natural Selection", subtitle: "Traits, Tradeoffs & Environment", color: "teal" },
   { id: 6, title: "Selfish Genes", subtitle: "Coming Soon", color: "gray", disabled: true },
   { id: 7, title: "Hawk-Dove Game", subtitle: "Coming Soon", color: "gray", disabled: true },
   { id: 8, title: "Green Beard", subtitle: "Coming Soon", color: "gray", disabled: true },
@@ -48,6 +48,7 @@ export default function Home() {
                   ${sim.color === "emerald" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
                   ${sim.color === "blue" ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}
                   ${sim.color === "amber" ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}
+                  ${sim.color === "teal" ? "bg-teal-600 hover:bg-teal-700 text-white" : ""}
                 `}
               >
                 <span className="text-2xl font-bold">{sim.id}</span>
