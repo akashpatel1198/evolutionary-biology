@@ -611,16 +611,27 @@ function useForagingSimulation(config: SimConfig) {
         setPopulation(nextGen.length);
 
         if (nextGen.length === 0) {
+          setCurrentCreatures(nextGen.map((c) => ({ ...c })));
           setIsRunning(false);
           break;
+        }
+
+        // At high speeds, update creatures at day boundaries so charts have fresh data
+        if (speedRef.current >= 25) {
+          setCurrentCreatures(nextGen.map((c) => ({ ...c })));
         }
       }
 
       } // end speed multiplier loop
 
+      const isFast = speedRef.current >= 25;
       setTickInDay(tickInDayRef.current);
-      setCurrentCreatures([...creaturesRef.current]);
-      setRenderTrigger((r) => r + 1);
+      // At high speeds, only update creatures/canvas on day boundaries (handled inside the loop via setPopulation etc.)
+      // At normal speeds, update every frame
+      if (!isFast) {
+        setCurrentCreatures(creaturesRef.current.map((c) => ({ ...c })));
+        setRenderTrigger((r) => r + 1);
+      }
     }, 33); // ~30fps
 
     return () => clearInterval(interval);
@@ -962,13 +973,22 @@ function BaselineSimSection() {
               <p className="text-sm font-medium text-gray-700 mb-2">
                 Foraging Field
               </p>
-              <canvas
-                ref={canvasRef}
-                width={CANVAS_SIZE}
-                height={CANVAS_SIZE}
-                className="w-full rounded-xl border border-gray-200"
-                style={{ imageRendering: "auto" }}
-              />
+              <div className="relative">
+                <canvas
+                  ref={canvasRef}
+                  width={CANVAS_SIZE}
+                  height={CANVAS_SIZE}
+                  className="w-full rounded-xl border border-gray-200"
+                  style={{ imageRendering: "auto" }}
+                />
+                {speedMultiplier >= 25 && isRunning && (
+                  <div className="absolute inset-0 bg-slate-900/80 rounded-xl flex flex-col items-center justify-center">
+                    <div className="text-white font-semibold text-lg">Fast Forwarding</div>
+                    <div className="text-slate-300 text-sm mt-1">{speedMultiplier}x speed · Day {day}</div>
+                    <div className="mt-3 w-8 h-8 border-2 border-teal-400 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
               <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
                 <span>
                   Day {day}, tick {tickInDay}/{dayLength}
@@ -977,6 +997,22 @@ function BaselineSimSection() {
                   <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>
                   Food: {foods.current.filter((f) => !f.eaten).length}
                 </span>
+              </div>
+              {/* Day length slider under field */}
+              <div className="mt-3 space-y-1">
+                <label className="flex justify-between text-xs font-medium text-gray-600">
+                  <span>Max day length</span>
+                  <span className="font-mono text-teal-600">{maxDayLen} ticks</span>
+                </label>
+                <input
+                  type="range"
+                  min="150"
+                  max="600"
+                  step="50"
+                  value={maxDayLen}
+                  onChange={(e) => setMaxDayLen(parseInt(e.target.value))}
+                  className="w-full accent-teal-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                />
               </div>
             </div>
 
@@ -1062,7 +1098,7 @@ function BaselineSimSection() {
               Reset
             </button>
             <div className="flex items-center gap-1">
-              {[1, 3, 5, 10].map((s) => (
+              {[1, 3, 5, 10, 25, 50].map((s) => (
                 <button
                   key={s}
                   onClick={() => setSpeedMultiplier(s)}
@@ -1078,28 +1114,6 @@ function BaselineSimSection() {
             </div>
           </div>
 
-          {/* Day length slider */}
-          <div className="space-y-2">
-            <label className="flex justify-between text-sm font-medium text-gray-700">
-              <span>Max Day Length (ticks)</span>
-              <span className="font-mono text-teal-600 bg-teal-50 px-2 py-0.5 rounded">
-                {maxDayLen}
-              </span>
-            </label>
-            <input
-              type="range"
-              min="150"
-              max="600"
-              step="50"
-              value={maxDayLen}
-              onChange={(e) => setMaxDayLen(parseInt(e.target.value))}
-              className="w-full accent-teal-500 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200"
-            />
-            <p className="text-xs text-gray-500">
-              How long each foraging day lasts. Shorter days are harder to survive.
-            </p>
-          </div>
-
           {/* Observation */}
           <div className="bg-gradient-to-r from-teal-50 to-emerald-50 rounded-xl p-4 border border-teal-200">
             <p className="text-sm text-teal-700">
@@ -1108,6 +1122,487 @@ function BaselineSimSection() {
               and then level off. The population starts below carrying capacity,
               but once it expands, the creatures really have to compete with each
               other for food.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// SECTION: SPEED MUTATION SIMULATION
+// ============================================================================
+
+function SpeedMutationSection() {
+  const [maxDayLen, setMaxDayLen] = useState(400);
+
+  const config: SimConfig = useMemo(
+    () => ({
+      fieldSize: FIELD_SIZE,
+      foodCount: 100,
+      initialPopulation: 50,
+      mutateSpeed: true,
+      mutateSize: false,
+      mutateSense: false,
+      initialSpeed: 1.0,
+      initialSize: 1.0,
+      initialSense: 1.0,
+      enablePredation: false,
+      maxDayLength: maxDayLen,
+    }),
+    [maxDayLen]
+  );
+
+  const {
+    creatures,
+    foods,
+    day,
+    tickInDay,
+    dayLength,
+    population,
+    history,
+    isRunning,
+    setIsRunning,
+    reset,
+    renderTrigger,
+    speedMultiplier,
+    setSpeedMultiplier,
+  } = useForagingSimulation(config);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    renderCanvas(ctx, creatures, foods.current, FIELD_SIZE, CANVAS_SIZE, "speed");
+  }, [renderTrigger, creatures, foods]);
+
+  // Build speed histogram data
+  const histogramData = useMemo(() => {
+    const alive = creatures.filter((c) => c.alive);
+    if (alive.length === 0) return [];
+    const bucketSize = 0.1;
+    const min = 0.1;
+    const max = 3.0;
+    const buckets: { range: string; count: number; speed: number }[] = [];
+    for (let s = min; s < max; s += bucketSize) {
+      buckets.push({
+        range: s.toFixed(1),
+        count: alive.filter((c) => c.speed >= s && c.speed < s + bucketSize).length,
+        speed: s,
+      });
+    }
+    return buckets.filter((b) => b.count > 0 || (b.speed >= 0.5 && b.speed <= 2.0));
+  }, [creatures]);
+
+  return (
+    <section className="space-y-4">
+      <div className="bg-white rounded-2xl shadow-lg shadow-teal-100/50 border border-teal-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 px-6 py-4">
+          <h2 className="text-white font-semibold text-lg">
+            Simulation: Speed Mutations
+          </h2>
+          <p className="text-blue-100 text-sm">
+            What happens when creatures can be born faster or slower?
+          </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <p className="text-gray-600">
+            Now let&apos;s introduce our first trait variation. When a creature
+            reproduces, the offspring&apos;s speed might be slightly different,
+            a little faster or a little slower. Faster creatures reach food
+            first, but there&apos;s a tradeoff.
+          </p>
+
+          {/* Speed tradeoff card */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+            <p className="text-sm font-semibold text-blue-800 mb-2">
+              The Speed Tradeoff
+            </p>
+            <p className="text-sm text-blue-700">
+              Moving faster means burning more energy. The cost scales with the{" "}
+              <span className="font-semibold">square</span> of speed, so a
+              creature twice as fast uses four times as much energy per tick.
+              Being fast helps you grab food before others, but if you
+              don&apos;t find food quickly, you starve even faster.
+            </p>
+            <div className="mt-3 font-mono text-sm text-center text-blue-900 bg-white/60 rounded-lg p-2">
+              energy cost per tick = speed<sup>2</sup> (with size and sense at 1.0)
+            </div>
+          </div>
+
+          {/* Canvas + Population chart */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Foraging Field{" "}
+                <span className="text-xs text-gray-400 font-normal">
+                  (color = speed: blue=slow, red=fast)
+                </span>
+              </p>
+              <div className="relative">
+                <canvas
+                  ref={canvasRef}
+                  width={CANVAS_SIZE}
+                  height={CANVAS_SIZE}
+                  className="w-full rounded-xl border border-gray-200"
+                  style={{ imageRendering: "auto" }}
+                />
+                {speedMultiplier >= 25 && isRunning && (
+                  <div className="absolute inset-0 bg-slate-900/80 rounded-xl flex flex-col items-center justify-center">
+                    <div className="text-white font-semibold text-lg">Fast Forwarding</div>
+                    <div className="text-slate-300 text-sm mt-1">{speedMultiplier}x speed · Day {day}</div>
+                    <div className="mt-3 w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                <span>
+                  Day {day}, tick {tickInDay}/{dayLength}
+                </span>
+                <span>
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>
+                  Food: {foods.current.filter((f) => !f.eaten).length}
+                </span>
+              </div>
+              {/* Day length slider under field */}
+              <div className="mt-3 space-y-1">
+                <label className="flex justify-between text-xs font-medium text-gray-600">
+                  <span>Max day length</span>
+                  <span className="font-mono text-blue-600">{maxDayLen} ticks</span>
+                </label>
+                <input
+                  type="range"
+                  min="150"
+                  max="600"
+                  step="50"
+                  value={maxDayLen}
+                  onChange={(e) => setMaxDayLen(parseInt(e.target.value))}
+                  className="w-full accent-blue-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                />
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Average Speed &amp; Population
+              </p>
+              <ResponsiveContainer width="100%" height={CANVAS_SIZE - 20}>
+                <LineChart data={history}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="day"
+                    fontSize={11}
+                    stroke="#9ca3af"
+                    label={{
+                      value: "Day",
+                      position: "insideBottomRight",
+                      offset: -5,
+                      fontSize: 11,
+                    }}
+                  />
+                  <YAxis yAxisId="left" fontSize={11} stroke="#9ca3af" />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    fontSize={11}
+                    stroke="#9ca3af"
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#fff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+                  <Legend verticalAlign="top" height={30} />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="population"
+                    name="Population"
+                    stroke="#0d9488"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="avgSpeed"
+                    name="Avg Speed"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <ReferenceLine
+                    yAxisId="left"
+                    y={1.0}
+                    stroke="#94a3b8"
+                    strokeDasharray="6 3"
+                    label={{
+                      value: "Starting speed",
+                      position: "insideTopRight",
+                      fontSize: 10,
+                      fill: "#94a3b8",
+                    }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Speed Distribution Histogram */}
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-2">
+              Speed Distribution (current generation)
+            </p>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={histogramData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis
+                  dataKey="range"
+                  fontSize={10}
+                  stroke="#9ca3af"
+                  label={{
+                    value: "Speed",
+                    position: "insideBottomRight",
+                    offset: -5,
+                    fontSize: 11,
+                  }}
+                />
+                <YAxis fontSize={11} stroke="#9ca3af" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#fff",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "12px",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                  }}
+                />
+                <Bar dataKey="count" name="Creatures" radius={[4, 4, 0, 0]}>
+                  {histogramData.map((entry, index) => {
+                    const t = clamp((entry.speed - 0.2) / 2.3, 0, 1);
+                    const hue = (1 - t) * 200;
+                    return (
+                      <Cell
+                        key={index}
+                        fill={`hsl(${hue}, 70%, 50%)`}
+                      />
+                    );
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-3">
+            <div className="text-center p-3 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
+              <p className="text-xs font-medium text-gray-500 mb-1">Day</p>
+              <p className="text-xl font-bold text-gray-700">{day}</p>
+            </div>
+            <div className="text-center p-3 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl border border-teal-100">
+              <p className="text-xs font-medium text-gray-500 mb-1">Population</p>
+              <p className="text-xl font-bold text-teal-600">{population}</p>
+            </div>
+            <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+              <p className="text-xs font-medium text-gray-500 mb-1">Avg Speed</p>
+              <p className="text-xl font-bold text-blue-600">
+                {creatures.length > 0
+                  ? (
+                      creatures
+                        .filter((c) => c.alive)
+                        .reduce((s, c) => s + c.speed, 0) /
+                      Math.max(1, creatures.filter((c) => c.alive).length)
+                    ).toFixed(2)
+                  : "—"}
+              </p>
+            </div>
+            <div className="text-center p-3 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
+              <p className="text-xs font-medium text-gray-500 mb-1">Food Left</p>
+              <p className="text-xl font-bold text-green-600">
+                {foods.current.filter((f) => !f.eaten).length}
+              </p>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => setIsRunning(!isRunning)}
+              className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 ${
+                isRunning
+                  ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+                  : "bg-gradient-to-r from-blue-500 to-indigo-500 text-white"
+              }`}
+            >
+              {isRunning ? "Pause" : "Start"}
+            </button>
+            <button
+              onClick={reset}
+              className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold text-gray-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+            >
+              Reset
+            </button>
+            <div className="flex items-center gap-1">
+              {[1, 3, 5, 10, 25, 50].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSpeedMultiplier(s)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    speedMultiplier === s
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {s}x
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Observation */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+            <p className="text-sm text-blue-700">
+              <strong>What to watch for:</strong> Average speed should creep up
+              over generations. Faster creatures grab food before slower ones, so
+              speed gets selected for. But here&apos;s the counterintuitive part:
+              the population actually <em>decreases</em> as average speed goes up.
+              Faster creatures burn more energy, so the same amount of food supports
+              fewer individuals. The creatures are evolving to be &quot;better&quot;
+              in a way that&apos;s worse for the population as a whole. This is a
+              preview of the selfish gene idea.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// SECTION: ENERGY COST MODEL (static)
+// ============================================================================
+
+function EnergyCostModelSection() {
+  return (
+    <section className="space-y-4">
+      <div className="bg-white rounded-2xl shadow-lg shadow-teal-100/50 border border-teal-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-500 to-fuchsia-500 px-6 py-4">
+          <h2 className="text-white font-semibold text-lg">
+            The Energy Cost Model
+          </h2>
+          <p className="text-purple-100 text-sm">
+            Three traits, three tradeoffs, one equation
+          </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <p className="text-gray-600">
+            Before we let all three traits mutate at once, let&apos;s understand
+            the cost model. Every tick, a creature pays an energy cost based on
+            its traits. If it runs out of energy before finding food and getting
+            back home, it dies.
+          </p>
+
+          {/* Equation */}
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 text-center">
+            <p className="text-xs uppercase tracking-wider text-slate-400 mb-3">
+              Energy Cost Per Tick
+            </p>
+            <p className="text-2xl font-mono text-white">
+              size<sup className="text-purple-300">3</sup>{" "}
+              <span className="text-slate-400">×</span>{" "}
+              speed<sup className="text-blue-300">2</sup>{" "}
+              <span className="text-slate-400">+</span>{" "}
+              <span className="text-green-300">sense</span>
+            </p>
+            <p className="text-xs text-slate-400 mt-3">
+              Default creature (all traits = 1.0): cost = 1 × 1 + 1 = 2 per tick
+            </p>
+          </div>
+
+          {/* Three trait cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Speed */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+                  <span className="text-white text-sm">⚡</span>
+                </div>
+                <h3 className="font-semibold text-blue-800">Speed</h3>
+              </div>
+              <p className="text-sm text-blue-700 mb-2">
+                <strong>Benefit:</strong> Reach food before others. Faster
+                creatures outcompete slower ones.
+              </p>
+              <p className="text-sm text-blue-600">
+                <strong>Cost:</strong> speed<sup>2</sup>. Doubles speed means 4x
+                the energy burn. Very expensive.
+              </p>
+              <div className="mt-3 text-xs font-mono bg-white/60 rounded-lg p-2 text-blue-800 text-center">
+                speed 1.0 → cost 1 | speed 2.0 → cost 4
+              </div>
+            </div>
+
+            {/* Size */}
+            <div className="bg-gradient-to-br from-purple-50 to-fuchsia-50 rounded-xl p-4 border border-purple-200">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center">
+                  <span className="text-white text-sm">🔵</span>
+                </div>
+                <h3 className="font-semibold text-purple-800">Size</h3>
+              </div>
+              <p className="text-sm text-purple-700 mb-2">
+                <strong>Benefit:</strong> Eat creatures 20% smaller than you.
+                Predation gives extra food.
+              </p>
+              <p className="text-sm text-purple-600">
+                <strong>Cost:</strong> size<sup>3</sup>, multiplied with speed.
+                The most punishing trait to increase.
+              </p>
+              <div className="mt-3 text-xs font-mono bg-white/60 rounded-lg p-2 text-purple-800 text-center">
+                size 1.0 → ×1 | size 2.0 → ×8
+              </div>
+            </div>
+
+            {/* Sense */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
+                  <span className="text-white text-sm">👁</span>
+                </div>
+                <h3 className="font-semibold text-green-800">Sense</h3>
+              </div>
+              <p className="text-sm text-green-700 mb-2">
+                <strong>Benefit:</strong> Larger detection radius. See food and
+                threats from farther away.
+              </p>
+              <p className="text-sm text-green-600">
+                <strong>Cost:</strong> Linear (just +sense). By far the cheapest
+                trait to increase.
+              </p>
+              <div className="mt-3 text-xs font-mono bg-white/60 rounded-lg p-2 text-green-800 text-center">
+                sense 1.0 → +1 | sense 2.0 → +2
+              </div>
+            </div>
+          </div>
+
+          {/* Key insight */}
+          <div className="bg-gradient-to-r from-purple-50 to-fuchsia-50 rounded-xl p-4 border border-purple-200">
+            <p className="text-sm text-purple-700">
+              <strong>Why does this matter?</strong> Size and speed are
+              multiplicative with each other (size<sup>3</sup> × speed<sup>2</sup>),
+              so being big AND fast is extremely expensive. Sense is additive, which
+              makes it relatively cheap. The cost model creates real tradeoffs:
+              you can&apos;t be good at everything.
             </p>
           </div>
         </div>
@@ -1128,6 +1623,8 @@ export default function Page5() {
         <RecapSection />
         <EnvironmentRulesSection />
         <BaselineSimSection />
+        <SpeedMutationSection />
+        <EnergyCostModelSection />
 
         <div className="h-8"></div>
       </div>
