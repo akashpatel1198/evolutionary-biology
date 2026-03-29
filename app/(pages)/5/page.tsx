@@ -66,6 +66,7 @@ interface SimConfig {
   initialSize: number;
   initialSense: number;
   enablePredation: boolean;
+  maxDayLength?: number; // cap on ticks per day (default: unlimited)
 }
 
 // ============================================================================
@@ -273,13 +274,17 @@ function useForagingSimulation(config: SimConfig) {
   const [isRunning, setIsRunning] = useState(false);
   const [renderTrigger, setRenderTrigger] = useState(0);
   const [currentCreatures, setCurrentCreatures] = useState<Creature[]>([]);
+  const [speedMultiplier, setSpeedMultiplier] = useState(1);
 
   const configRef = useRef(config);
   configRef.current = config;
+  const speedRef = useRef(1);
+  speedRef.current = speedMultiplier;
 
   // Compute day length: enough ticks for the most efficient creature to exhaust energy
   function computeDayLength(creatures: Creature[]): number {
     if (creatures.length === 0) return 400;
+    const cfg = configRef.current;
     let maxTicks = 0;
     for (const c of creatures) {
       const cost = energyCost(c);
@@ -287,7 +292,8 @@ function useForagingSimulation(config: SimConfig) {
         maxTicks = Math.max(maxTicks, Math.ceil(STARTING_ENERGY / cost));
       }
     }
-    return Math.max(100, maxTicks);
+    const dl = Math.max(100, maxTicks);
+    return cfg.maxDayLength ? Math.min(dl, cfg.maxDayLength) : dl;
   }
 
   const initialize = useCallback(() => {
@@ -346,6 +352,9 @@ function useForagingSimulation(config: SimConfig) {
       const creatures = creaturesRef.current;
       const foods = foodsRef.current;
       const fs = cfg.fieldSize;
+      const ticksThisFrame = speedRef.current;
+
+      for (let frame = 0; frame < ticksThisFrame; frame++) {
 
       // --- TICK LOGIC ---
       for (const c of creatures) {
@@ -603,8 +612,11 @@ function useForagingSimulation(config: SimConfig) {
 
         if (nextGen.length === 0) {
           setIsRunning(false);
+          break;
         }
       }
+
+      } // end speed multiplier loop
 
       setTickInDay(tickInDayRef.current);
       setCurrentCreatures([...creaturesRef.current]);
@@ -626,6 +638,8 @@ function useForagingSimulation(config: SimConfig) {
     setIsRunning,
     reset,
     renderTrigger,
+    speedMultiplier,
+    setSpeedMultiplier,
   };
 }
 
@@ -877,6 +891,8 @@ function EnvironmentRulesSection() {
 // ============================================================================
 
 function BaselineSimSection() {
+  const [maxDayLen, setMaxDayLen] = useState(400);
+
   const config: SimConfig = useMemo(
     () => ({
       fieldSize: FIELD_SIZE,
@@ -889,8 +905,9 @@ function BaselineSimSection() {
       initialSize: 1.0,
       initialSense: 1.0,
       enablePredation: false,
+      maxDayLength: maxDayLen,
     }),
-    []
+    [maxDayLen]
   );
 
   const {
@@ -905,6 +922,8 @@ function BaselineSimSection() {
     setIsRunning,
     reset,
     renderTrigger,
+    speedMultiplier,
+    setSpeedMultiplier,
   } = useForagingSimulation(config);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1042,6 +1061,43 @@ function BaselineSimSection() {
             >
               Reset
             </button>
+            <div className="flex items-center gap-1">
+              {[1, 3, 5, 10].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSpeedMultiplier(s)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    speedMultiplier === s
+                      ? "bg-teal-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {s}x
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Day length slider */}
+          <div className="space-y-2">
+            <label className="flex justify-between text-sm font-medium text-gray-700">
+              <span>Max Day Length (ticks)</span>
+              <span className="font-mono text-teal-600 bg-teal-50 px-2 py-0.5 rounded">
+                {maxDayLen}
+              </span>
+            </label>
+            <input
+              type="range"
+              min="150"
+              max="600"
+              step="50"
+              value={maxDayLen}
+              onChange={(e) => setMaxDayLen(parseInt(e.target.value))}
+              className="w-full accent-teal-500 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200"
+            />
+            <p className="text-xs text-gray-500">
+              How long each foraging day lasts. Shorter days are harder to survive.
+            </p>
           </div>
 
           {/* Observation */}
