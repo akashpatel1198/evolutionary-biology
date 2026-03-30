@@ -67,6 +67,8 @@ interface SimConfig {
   initialSense: number;
   enablePredation: boolean;
   maxDayLength?: number; // cap on ticks per day (default: unlimited)
+  mutationChance?: number; // override global MUTATION_CHANCE
+  mutationVariation?: number; // override global MUTATION_VARIATION
 }
 
 // ============================================================================
@@ -212,14 +214,6 @@ function spawnCreatureAtEdge(
   };
 }
 
-function mutateTrait(value: number): number {
-  if (Math.random() < MUTATION_CHANCE) {
-    const delta = Math.random() < 0.5 ? MUTATION_VARIATION : -MUTATION_VARIATION;
-    return Math.max(0.1, value + delta);
-  }
-  return value;
-}
-
 // Smooth turning + movement per tick (matching source model)
 function updateHeadingAndMove(c: Creature, fieldSize: number): void {
   // Turn toward headingTarget with acceleration-based smoothing
@@ -329,7 +323,15 @@ function useForagingSimulation(config: SimConfig) {
     setDayLength(dl);
     setTickInDay(0);
     setPopulation(cfg.initialPopulation);
-    setHistory([]);
+    setHistory([{
+      day: 0,
+      population: cfg.initialPopulation,
+      avgSpeed: cfg.initialSpeed,
+      avgSize: cfg.initialSize,
+      avgSense: cfg.initialSense,
+      deaths: 0,
+      births: 0,
+    }]);
     setCurrentCreatures([...creaturesRef.current]);
     setRenderTrigger((r) => r + 1);
   }, []);
@@ -522,15 +524,17 @@ function useForagingSimulation(config: SimConfig) {
             deaths++;
           }
           if (c.foodEaten >= 2 && madeItHome) {
-            const childSpeed = cfg.mutateSpeed
-              ? mutateTrait(c.speed)
-              : c.speed;
-            const childSize = cfg.mutateSize
-              ? mutateTrait(c.size)
-              : c.size;
-            const childSense = cfg.mutateSense
-              ? mutateTrait(c.sense)
-              : c.sense;
+            const mChance = cfg.mutationChance ?? MUTATION_CHANCE;
+            const mVar = cfg.mutationVariation ?? MUTATION_VARIATION;
+            const mutate = (v: number) => {
+              if (Math.random() < mChance) {
+                return Math.max(0.1, v + (Math.random() < 0.5 ? mVar : -mVar));
+              }
+              return v;
+            };
+            const childSpeed = cfg.mutateSpeed ? mutate(c.speed) : c.speed;
+            const childSize = cfg.mutateSize ? mutate(c.size) : c.size;
+            const childSense = cfg.mutateSense ? mutate(c.sense) : c.sense;
 
             offspring.push(
               spawnCreatureAtEdge(
@@ -908,7 +912,7 @@ function BaselineSimSection() {
     () => ({
       fieldSize: FIELD_SIZE,
       foodCount: 100,
-      initialPopulation: 50,
+      initialPopulation: 15,
       mutateSpeed: false,
       mutateSize: false,
       mutateSense: false,
@@ -1117,11 +1121,11 @@ function BaselineSimSection() {
           {/* Observation */}
           <div className="bg-gradient-to-r from-teal-50 to-emerald-50 rounded-xl p-4 border border-teal-200">
             <p className="text-sm text-teal-700">
-              <strong>What to watch for:</strong> The population starts at 50
-              creatures with 100 food. It should expand over the first few days
-              and then level off. The population starts below carrying capacity,
-              but once it expands, the creatures really have to compete with each
-              other for food.
+              <strong>What to watch for:</strong> The population starts at just 15
+              creatures with 100 food. With so much food available, almost everyone
+              eats enough to reproduce and the population grows fast. But as it
+              grows, competition kicks in and growth slows down, producing the
+              S-shaped curve we saw in Chapter 4.
             </p>
           </div>
         </div>
@@ -1139,9 +1143,9 @@ function SpeedMutationSection() {
 
   const config: SimConfig = useMemo(
     () => ({
-      fieldSize: FIELD_SIZE,
-      foodCount: 100,
-      initialPopulation: 50,
+      fieldSize: 200,
+      foodCount: 150,
+      initialPopulation: 40,
       mutateSpeed: true,
       mutateSize: false,
       mutateSense: false,
@@ -1150,6 +1154,8 @@ function SpeedMutationSection() {
       initialSense: 1.0,
       enablePredation: false,
       maxDayLength: maxDayLen,
+      mutationChance: 0.10,
+      mutationVariation: 0.2,
     }),
     [maxDayLen]
   );
@@ -1177,7 +1183,7 @@ function SpeedMutationSection() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    renderCanvas(ctx, creatures, foods.current, FIELD_SIZE, CANVAS_SIZE, "speed");
+    renderCanvas(ctx, creatures, foods.current, config.fieldSize, CANVAS_SIZE, "speed");
   }, [renderTrigger, creatures, foods]);
 
   // Build speed histogram data
