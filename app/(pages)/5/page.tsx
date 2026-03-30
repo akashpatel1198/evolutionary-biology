@@ -712,9 +712,9 @@ function renderCanvas(
     if (colorMode === "uniform") {
       color = "#0d9488"; // teal-600
     } else if (colorMode === "speed") {
-      // Map speed to hue: blue (slow, 0.2) -> yellow (1.0) -> red (fast, 2.5+)
-      const t = clamp((creature.speed - 0.2) / 2.3, 0, 1);
-      const hue = (1 - t) * 200 + t * 0; // 200=blue -> 0=red
+      // Map speed to hue: blue (slow, 0.2) -> red (fast, 5.0)
+      const t = clamp((creature.speed - 0.2) / 4.8, 0, 1);
+      const hue = (1 - t) * 200; // 200=blue -> 0=red
       color = `hsl(${hue}, 70%, 50%)`;
     } else {
       // traits mode: mix of speed (red), size (blue), sense (green)
@@ -1184,19 +1184,20 @@ function SpeedMutationSection() {
   const histogramData = useMemo(() => {
     const alive = creatures.filter((c) => c.alive);
     if (alive.length === 0) return [];
-    const bucketSize = 0.1;
-    const min = 0.1;
-    const max = 3.0;
+    const bucketSize = 0.2;
+    const speeds = alive.map((c) => c.speed);
+    const minSpeed = Math.floor(Math.min(...speeds) * 5) / 5; // round down to nearest 0.2
+    const maxSpeed = Math.ceil(Math.max(...speeds) * 5) / 5 + bucketSize; // round up
     const buckets: { range: string; count: number; speed: number }[] = [];
-    for (let s = min; s < max; s += bucketSize) {
+    for (let s = Math.max(0.1, minSpeed - 0.2); s < maxSpeed + 0.2; s = Math.round((s + bucketSize) * 10) / 10) {
       buckets.push({
         range: s.toFixed(1),
         count: alive.filter((c) => c.speed >= s && c.speed < s + bucketSize).length,
         speed: s,
       });
     }
-    return buckets.filter((b) => b.count > 0 || (b.speed >= 0.5 && b.speed <= 2.0));
-  }, [creatures]);
+    return buckets;
+  }, [creatures, day]);
 
   return (
     <section className="space-y-4">
@@ -1386,9 +1387,13 @@ function SpeedMutationSection() {
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
                 />
-                <Bar dataKey="count" name="Creatures" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="count" name="Creatures" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                   {histogramData.map((entry, index) => {
-                    const t = clamp((entry.speed - 0.2) / 2.3, 0, 1);
+                    const speeds = histogramData.filter((b) => b.count > 0).map((b) => b.speed);
+                    const lo = speeds.length > 0 ? Math.min(...speeds) : 0.2;
+                    const hi = speeds.length > 0 ? Math.max(...speeds) : 2.5;
+                    const range = Math.max(hi - lo, 0.5);
+                    const t = clamp((entry.speed - lo) / range, 0, 1);
                     const hue = (1 - t) * 200;
                     return (
                       <Cell
