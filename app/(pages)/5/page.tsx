@@ -1122,10 +1122,11 @@ function BaselineSimSection() {
           <div className="bg-gradient-to-r from-teal-50 to-emerald-50 rounded-xl p-4 border border-teal-200">
             <p className="text-sm text-teal-700">
               <strong>What to watch for:</strong> The population starts at just 15
-              creatures with 100 food. With so much food available, almost everyone
-              eats enough to reproduce and the population grows fast. But as it
-              grows, competition kicks in and growth slows down, producing the
-              S-shaped curve we saw in Chapter 4.
+              creatures with 100 food. It should expand quickly over the first
+              few days since there&apos;s plenty of food to go around. But as the
+              population grows, competition kicks in and growth levels off. The
+              creatures really have to compete with each other for food once they
+              approach carrying capacity.
             </p>
           </div>
         </div>
@@ -1623,6 +1624,823 @@ function EnergyCostModelSection() {
 }
 
 // ============================================================================
+// SECTION: THREE TRAITS SIMULATION
+// ============================================================================
+
+function ThreeTraitsSimSection() {
+  const [maxDayLen, setMaxDayLen] = useState(400);
+
+  const config: SimConfig = useMemo(
+    () => ({
+      fieldSize: 200,
+      foodCount: 150,
+      initialPopulation: 40,
+      mutateSpeed: true,
+      mutateSize: true,
+      mutateSense: true,
+      initialSpeed: 1.0,
+      initialSize: 1.0,
+      initialSense: 1.0,
+      enablePredation: true,
+      maxDayLength: maxDayLen,
+      mutationChance: 0.10,
+      mutationVariation: 0.2,
+    }),
+    [maxDayLen]
+  );
+
+  const {
+    creatures,
+    foods,
+    day,
+    tickInDay,
+    dayLength,
+    population,
+    history,
+    isRunning,
+    setIsRunning,
+    reset,
+    renderTrigger,
+    speedMultiplier,
+    setSpeedMultiplier,
+  } = useForagingSimulation(config);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    renderCanvas(ctx, creatures, foods.current, config.fieldSize, CANVAS_SIZE, "traits");
+  }, [renderTrigger, creatures, foods, config.fieldSize]);
+
+  // Build histograms for all three traits
+  const buildHistogram = useCallback(
+    (trait: "speed" | "size" | "sense") => {
+      const alive = creatures.filter((c) => c.alive);
+      if (alive.length === 0) return [];
+      const bucketSize = 0.2;
+      const values = alive.map((c) => c[trait]);
+      const lo = Math.floor(Math.min(...values) * 5) / 5;
+      const hi = Math.ceil(Math.max(...values) * 5) / 5 + bucketSize;
+      const buckets: { range: string; count: number; val: number }[] = [];
+      for (
+        let v = Math.max(0.1, lo - 0.2);
+        v < hi + 0.2;
+        v = Math.round((v + bucketSize) * 10) / 10
+      ) {
+        buckets.push({
+          range: v.toFixed(1),
+          count: alive.filter((c) => c[trait] >= v && c[trait] < v + bucketSize)
+            .length,
+          val: v,
+        });
+      }
+      return buckets;
+    },
+    [creatures, day] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const speedHist = useMemo(() => buildHistogram("speed"), [buildHistogram]);
+  const sizeHist = useMemo(() => buildHistogram("size"), [buildHistogram]);
+  const senseHist = useMemo(() => buildHistogram("sense"), [buildHistogram]);
+
+  const alive = creatures.filter((c) => c.alive);
+  const avgSpeed =
+    alive.length > 0
+      ? alive.reduce((s, c) => s + c.speed, 0) / alive.length
+      : 0;
+  const avgSize =
+    alive.length > 0
+      ? alive.reduce((s, c) => s + c.size, 0) / alive.length
+      : 0;
+  const avgSense =
+    alive.length > 0
+      ? alive.reduce((s, c) => s + c.sense, 0) / alive.length
+      : 0;
+
+  return (
+    <section className="space-y-4">
+      <div className="bg-white rounded-2xl shadow-lg shadow-teal-100/50 border border-teal-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
+          <h2 className="text-white font-semibold text-lg">
+            Simulation: All Three Traits
+          </h2>
+          <p className="text-amber-100 text-sm">
+            Speed, size, and sense mutating together with predation enabled
+          </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <p className="text-gray-600">
+            Now we let everything loose. All three traits can mutate, and bigger
+            creatures can eat smaller ones. The interactions between traits get
+            really interesting. Speed settled in a predictable way when it was
+            alone, but what happens when size and sense are in the mix too?
+          </p>
+
+          {/* Canvas + Trait averages chart */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Foraging Field{" "}
+                <span className="text-xs text-gray-400 font-normal">
+                  (color: red=speed, blue=size, green=sense)
+                </span>
+              </p>
+              <div className="relative">
+                <canvas
+                  ref={canvasRef}
+                  width={CANVAS_SIZE}
+                  height={CANVAS_SIZE}
+                  className="w-full rounded-xl border border-gray-200"
+                  style={{ imageRendering: "auto" }}
+                />
+                {speedMultiplier >= 25 && isRunning && (
+                  <div className="absolute inset-0 bg-slate-900/80 rounded-xl flex flex-col items-center justify-center">
+                    <div className="text-white font-semibold text-lg">
+                      Fast Forwarding
+                    </div>
+                    <div className="text-slate-300 text-sm mt-1">
+                      {speedMultiplier}x speed · Day {day}
+                    </div>
+                    <div className="mt-3 w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                <span>
+                  Day {day}, tick {tickInDay}/{dayLength}
+                </span>
+                <span>
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>
+                  Food: {foods.current.filter((f) => !f.eaten).length}
+                </span>
+              </div>
+              <div className="mt-3 space-y-1">
+                <label className="flex justify-between text-xs font-medium text-gray-600">
+                  <span>Max day length</span>
+                  <span className="font-mono text-amber-600">
+                    {maxDayLen} ticks
+                  </span>
+                </label>
+                <input
+                  type="range"
+                  min="150"
+                  max="600"
+                  step="50"
+                  value={maxDayLen}
+                  onChange={(e) => setMaxDayLen(parseInt(e.target.value))}
+                  className="w-full accent-amber-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                />
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Trait Averages Over Days
+              </p>
+              <ResponsiveContainer width="100%" height={CANVAS_SIZE - 20}>
+                <LineChart data={history}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="day"
+                    fontSize={11}
+                    stroke="#9ca3af"
+                    label={{
+                      value: "Day",
+                      position: "insideBottomRight",
+                      offset: -5,
+                      fontSize: 11,
+                    }}
+                  />
+                  <YAxis yAxisId="left" fontSize={11} stroke="#9ca3af" />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    fontSize={11}
+                    stroke="#9ca3af"
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#fff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+                  <Legend verticalAlign="top" height={30} />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="population"
+                    name="Population"
+                    stroke="#9ca3af"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 2"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="avgSpeed"
+                    name="Avg Speed"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="avgSize"
+                    name="Avg Size"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="avgSense"
+                    name="Avg Sense"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Three histograms */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs font-medium text-red-600 mb-1 text-center">
+                Speed Distribution
+              </p>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={speedHist}>
+                  <XAxis dataKey="range" fontSize={9} stroke="#9ca3af" />
+                  <YAxis fontSize={9} stroke="#9ca3af" width={25} />
+                  <Bar
+                    dataKey="count"
+                    fill="#ef4444"
+                    radius={[2, 2, 0, 0]}
+                    isAnimationActive={false}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-indigo-600 mb-1 text-center">
+                Size Distribution
+              </p>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={sizeHist}>
+                  <XAxis dataKey="range" fontSize={9} stroke="#9ca3af" />
+                  <YAxis fontSize={9} stroke="#9ca3af" width={25} />
+                  <Bar
+                    dataKey="count"
+                    fill="#6366f1"
+                    radius={[2, 2, 0, 0]}
+                    isAnimationActive={false}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-green-600 mb-1 text-center">
+                Sense Distribution
+              </p>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={senseHist}>
+                  <XAxis dataKey="range" fontSize={9} stroke="#9ca3af" />
+                  <YAxis fontSize={9} stroke="#9ca3af" width={25} />
+                  <Bar
+                    dataKey="count"
+                    fill="#22c55e"
+                    radius={[2, 2, 0, 0]}
+                    isAnimationActive={false}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-5 gap-2">
+            <div className="text-center p-2 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
+              <p className="text-xs font-medium text-gray-500 mb-1">Day</p>
+              <p className="text-lg font-bold text-gray-700">{day}</p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
+              <p className="text-xs font-medium text-gray-500 mb-1">Pop</p>
+              <p className="text-lg font-bold text-gray-700">{population}</p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-red-50 to-rose-50 rounded-xl border border-red-100">
+              <p className="text-xs font-medium text-red-500 mb-1">Speed</p>
+              <p className="text-lg font-bold text-red-600">
+                {avgSpeed.toFixed(2)}
+              </p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-indigo-50 to-violet-50 rounded-xl border border-indigo-100">
+              <p className="text-xs font-medium text-indigo-500 mb-1">Size</p>
+              <p className="text-lg font-bold text-indigo-600">
+                {avgSize.toFixed(2)}
+              </p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
+              <p className="text-xs font-medium text-green-500 mb-1">Sense</p>
+              <p className="text-lg font-bold text-green-600">
+                {avgSense.toFixed(2)}
+              </p>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => setIsRunning(!isRunning)}
+              className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 ${
+                isRunning
+                  ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+                  : "bg-gradient-to-r from-amber-500 to-orange-600 text-white"
+              }`}
+            >
+              {isRunning ? "Pause" : "Start"}
+            </button>
+            <button
+              onClick={reset}
+              className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold text-gray-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+            >
+              Reset
+            </button>
+            <div className="flex items-center gap-1">
+              {[1, 3, 5, 10, 25, 50].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSpeedMultiplier(s)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    speedMultiplier === s
+                      ? "bg-amber-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {s}x
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Observation */}
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200">
+            <p className="text-sm text-amber-700">
+              <strong>What to watch for:</strong> With all three traits in play,
+              things get harder to predict. Speed doesn&apos;t settle the same
+              way as when it was the only trait. The interactions between traits
+              create unexpected dynamics. You might see trends that seem
+              counterintuitive at first, but remember that each trait&apos;s
+              value depends on what every other creature is doing. Watch how the
+              population changes compared to the speed-only simulation.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// SECTION: ENVIRONMENTAL CHANGE
+// ============================================================================
+
+function EnvironmentalChangeSection() {
+  const [maxDayLen, setMaxDayLen] = useState(400);
+
+  // Food starts at 150, decreases by 1 every 2 days down to 10
+  const [foodOverride, setFoodOverride] = useState(150);
+  const foodOverrideRef = useRef(150);
+  foodOverrideRef.current = foodOverride;
+
+  const config: SimConfig = useMemo(
+    () => ({
+      fieldSize: 200,
+      foodCount: foodOverride,
+      initialPopulation: 40,
+      mutateSpeed: true,
+      mutateSize: true,
+      mutateSense: true,
+      initialSpeed: 1.0,
+      initialSize: 1.0,
+      initialSense: 1.0,
+      enablePredation: true,
+      maxDayLength: maxDayLen,
+      mutationChance: 0.10,
+      mutationVariation: 0.2,
+    }),
+    [maxDayLen, foodOverride]
+  );
+
+  const {
+    creatures,
+    foods,
+    day,
+    tickInDay,
+    dayLength,
+    history,
+    isRunning,
+    setIsRunning,
+    reset,
+    renderTrigger,
+    speedMultiplier,
+    setSpeedMultiplier,
+  } = useForagingSimulation(config);
+
+  // Gradually decrease food: every 2 days, reduce by 1 (down to 10)
+  const lastFoodUpdateDay = useRef(0);
+  useEffect(() => {
+    if (day > lastFoodUpdateDay.current && day > 1) {
+      lastFoodUpdateDay.current = day;
+      if (day % 2 === 0) {
+        setFoodOverride((prev) => Math.max(10, prev - 1));
+      }
+    }
+  }, [day]);
+
+  const handleReset = useCallback(() => {
+    setFoodOverride(150);
+    lastFoodUpdateDay.current = 0;
+    reset();
+  }, [reset]);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    renderCanvas(
+      ctx,
+      creatures,
+      foods.current,
+      config.fieldSize,
+      CANVAS_SIZE,
+      "traits"
+    );
+  }, [renderTrigger, creatures, foods, config.fieldSize]);
+
+  const alive = creatures.filter((c) => c.alive);
+  const avgSpeed =
+    alive.length > 0
+      ? alive.reduce((s, c) => s + c.speed, 0) / alive.length
+      : 0;
+  const avgSize =
+    alive.length > 0
+      ? alive.reduce((s, c) => s + c.size, 0) / alive.length
+      : 0;
+  const avgSense =
+    alive.length > 0
+      ? alive.reduce((s, c) => s + c.sense, 0) / alive.length
+      : 0;
+
+  // Add food supply to history for chart
+  const historyWithFood = useMemo(
+    () =>
+      history.map((h) => ({
+        ...h,
+        foodSupply:
+          150 - Math.floor(Math.max(0, h.day - 1) / 2),
+      })).map((h) => ({ ...h, foodSupply: Math.max(10, h.foodSupply) })),
+    [history]
+  );
+
+  return (
+    <section className="space-y-4">
+      <div className="bg-white rounded-2xl shadow-lg shadow-teal-100/50 border border-teal-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-rose-500 to-red-500 px-6 py-4">
+          <h2 className="text-white font-semibold text-lg">
+            Simulation: Environmental Change
+          </h2>
+          <p className="text-rose-100 text-sm">
+            What happens when food gradually disappears?
+          </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <p className="text-gray-600">
+            Everything we&apos;ve seen so far has been in a stable environment.
+            But what if the environment changes? Here the food supply starts at
+            150 and drops by 1 every 2 days, all the way down to 10. This
+            completely reshuffles which traits are valuable.
+          </p>
+
+          {/* Canvas + Traits chart */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Foraging Field{" "}
+                <span className="text-xs text-gray-400 font-normal">
+                  (color: red=speed, blue=size, green=sense)
+                </span>
+              </p>
+              <div className="relative">
+                <canvas
+                  ref={canvasRef}
+                  width={CANVAS_SIZE}
+                  height={CANVAS_SIZE}
+                  className="w-full rounded-xl border border-gray-200"
+                  style={{ imageRendering: "auto" }}
+                />
+                {speedMultiplier >= 25 && isRunning && (
+                  <div className="absolute inset-0 bg-slate-900/80 rounded-xl flex flex-col items-center justify-center">
+                    <div className="text-white font-semibold text-lg">
+                      Fast Forwarding
+                    </div>
+                    <div className="text-slate-300 text-sm mt-1">
+                      {speedMultiplier}x speed · Day {day}
+                    </div>
+                    <div className="mt-3 w-8 h-8 border-2 border-rose-400 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                <span>
+                  Day {day}, tick {tickInDay}/{dayLength}
+                </span>
+                <span className="flex items-center gap-3">
+                  <span>
+                    <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>
+                    Food: {foodOverride}/day
+                  </span>
+                </span>
+              </div>
+              <div className="mt-3 space-y-1">
+                <label className="flex justify-between text-xs font-medium text-gray-600">
+                  <span>Max day length</span>
+                  <span className="font-mono text-rose-600">
+                    {maxDayLen} ticks
+                  </span>
+                </label>
+                <input
+                  type="range"
+                  min="150"
+                  max="600"
+                  step="50"
+                  value={maxDayLen}
+                  onChange={(e) => setMaxDayLen(parseInt(e.target.value))}
+                  className="w-full accent-rose-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                />
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Traits &amp; Food Supply
+              </p>
+              <ResponsiveContainer width="100%" height={CANVAS_SIZE - 20}>
+                <LineChart data={historyWithFood}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="day"
+                    fontSize={11}
+                    stroke="#9ca3af"
+                    label={{
+                      value: "Day",
+                      position: "insideBottomRight",
+                      offset: -5,
+                      fontSize: 11,
+                    }}
+                  />
+                  <YAxis yAxisId="left" fontSize={11} stroke="#9ca3af" />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    fontSize={11}
+                    stroke="#9ca3af"
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#fff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+                  <Legend verticalAlign="top" height={30} />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="population"
+                    name="Population"
+                    stroke="#9ca3af"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 2"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="foodSupply"
+                    name="Food/Day"
+                    stroke="#f97316"
+                    strokeWidth={2}
+                    strokeDasharray="6 3"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="avgSpeed"
+                    name="Avg Speed"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="avgSize"
+                    name="Avg Size"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="avgSense"
+                    name="Avg Sense"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-5 gap-2">
+            <div className="text-center p-2 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
+              <p className="text-xs font-medium text-gray-500 mb-1">Day</p>
+              <p className="text-lg font-bold text-gray-700">{day}</p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-100">
+              <p className="text-xs font-medium text-orange-500 mb-1">Food</p>
+              <p className="text-lg font-bold text-orange-600">{foodOverride}</p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-red-50 to-rose-50 rounded-xl border border-red-100">
+              <p className="text-xs font-medium text-red-500 mb-1">Speed</p>
+              <p className="text-lg font-bold text-red-600">
+                {avgSpeed.toFixed(2)}
+              </p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-indigo-50 to-violet-50 rounded-xl border border-indigo-100">
+              <p className="text-xs font-medium text-indigo-500 mb-1">Size</p>
+              <p className="text-lg font-bold text-indigo-600">
+                {avgSize.toFixed(2)}
+              </p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
+              <p className="text-xs font-medium text-green-500 mb-1">Sense</p>
+              <p className="text-lg font-bold text-green-600">
+                {avgSense.toFixed(2)}
+              </p>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => setIsRunning(!isRunning)}
+              className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 ${
+                isRunning
+                  ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+                  : "bg-gradient-to-r from-rose-500 to-red-500 text-white"
+              }`}
+            >
+              {isRunning ? "Pause" : "Start"}
+            </button>
+            <button
+              onClick={handleReset}
+              className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold text-gray-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+            >
+              Reset
+            </button>
+            <div className="flex items-center gap-1">
+              {[1, 3, 5, 10, 25, 50].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSpeedMultiplier(s)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    speedMultiplier === s
+                      ? "bg-rose-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {s}x
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Observation */}
+          <div className="bg-gradient-to-r from-rose-50 to-red-50 rounded-xl p-4 border border-rose-200">
+            <p className="text-sm text-rose-700">
+              <strong>What to watch for:</strong> As food drops, the population
+              shrinks and the selection pressure changes dramatically. Size tends
+              to decrease because big creatures are too expensive to maintain
+              when food is scarce. Sense becomes extremely valuable because
+              finding the few remaining food items is critical. And speed
+              actually goes <em>up</em>, which can be surprising. When there are
+              only a few food items, it becomes a race. The environment
+              completely reshapes which traits are &quot;fit.&quot;
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// SECTION: KEY INSIGHTS
+// ============================================================================
+
+function KeyInsightsSection() {
+  const insights = [
+    {
+      title: "Fitness is not a fixed property",
+      text: "A creature isn't inherently \"fit.\" Fitness emerges from the interaction between its traits and the environment. Change the environment, and what's fit changes too.",
+    },
+    {
+      title: "Selection doesn't require intent",
+      text: "Nobody tells the simulation who should survive. The rules are simple: find food, get home, reproduce. Natural selection is just the inevitable result of variation + differential survival.",
+    },
+    {
+      title: "Traits have tradeoffs",
+      text: "There's no free lunch. Speed helps you get food but burns energy. Size lets you eat others but is incredibly expensive. Every advantage comes with a cost.",
+    },
+    {
+      title: "Evolution can be bad for the population",
+      text: "When speed evolved upward, population went down. Individuals evolved to be \"better\" at competing, but the population paid the price. What's good for the individual gene isn't always good for the group.",
+    },
+    {
+      title: "Cheap traits spread easily",
+      text: "Sense has a linear cost while speed and size are quadratic or cubic. Cheap-to-maintain advantages tend to spread more broadly through a population.",
+    },
+    {
+      title: "Environmental change reshuffles everything",
+      text: "Traits that were well-adapted to abundant food become liabilities when food is scarce. Evolution doesn't have a finish line because the environment keeps changing.",
+    },
+    {
+      title: "Equilibrium is temporary",
+      text: "Populations stabilize, trait averages settle, but it's always contingent on current conditions. A new mutation, a new competitor, or a change in resources can destabilize everything.",
+    },
+  ];
+
+  return (
+    <section className="space-y-4">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-xl overflow-hidden">
+        <div className="px-6 py-5">
+          <h2 className="text-white font-semibold text-lg">Key Takeaways</h2>
+          <p className="text-slate-400 text-sm">
+            The big ideas from this chapter
+          </p>
+        </div>
+        <div className="px-6 pb-6 space-y-3">
+          {insights.map((insight, i) => (
+            <div
+              key={i}
+              className="bg-white/5 rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-colors"
+            >
+              <p className="text-white font-medium text-sm mb-1">
+                <span className="text-teal-400 mr-2">{i + 1}.</span>
+                {insight.title}
+              </p>
+              <p className="text-slate-400 text-sm leading-relaxed">
+                {insight.text}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
 // MAIN PAGE
 // ============================================================================
 
@@ -1636,6 +2454,9 @@ export default function Page5() {
         <BaselineSimSection />
         <SpeedMutationSection />
         <EnergyCostModelSection />
+        <ThreeTraitsSimSection />
+        <EnvironmentalChangeSection />
+        <KeyInsightsSection />
 
         <div className="h-8"></div>
       </div>
