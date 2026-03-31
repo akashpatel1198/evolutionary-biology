@@ -2141,8 +2141,8 @@ function EnvironmentalChangeSection() {
         <div className="p-6 space-y-6">
           <p className="text-gray-600">
             Everything we&apos;ve seen so far has been in a stable environment.
-            But what if the environment changes? Here the food supply starts at
-            {pp.food} and drops by 1 every {pp.decline} days, down to 15. This
+            But what if the environment changes? Here the food supply starts
+            at {pp.food} and drops by 1 every {pp.decline} days, down to 15. This
             completely reshuffles which traits are valuable.
           </p>
 
@@ -2378,14 +2378,13 @@ function EnvironmentalChangeSection() {
           {/* Observation */}
           <div className="bg-gradient-to-r from-rose-50 to-red-50 rounded-xl p-4 border border-rose-200">
             <p className="text-sm text-rose-700">
-              <strong>What to watch for:</strong> As food declines, the selection
-              pressure shifts. Traits that worked in abundance may become
-              liabilities in scarcity. Watch how the trait averages respond as
-              the food supply drops. The population will shrink, and which
-              creatures survive tells you what the environment is now selecting
-              for. Try the turbo preset with high speed to see the full arc
-              play out. The environment completely reshapes which traits
-              are &quot;fit.&quot;
+              <strong>Note:</strong> With these parameters, the food decline is
+              fast relative to how quickly mutation and selection can shift
+              trait averages. Populations often collapse abruptly because
+              they simply can&apos;t adapt fast enough. Slowing the decline
+              would help, but makes the simulation run too long to watch.
+              This is a real tradeoff in evolution: when the environment
+              changes faster than a population can adapt, extinction follows.
             </p>
           </div>
         </div>
@@ -2431,29 +2430,48 @@ function KeyInsightsSection() {
   ];
 
   return (
-    <section className="space-y-4">
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-xl overflow-hidden">
-        <div className="px-6 py-5">
-          <h2 className="text-white font-semibold text-lg">Key Takeaways</h2>
-          <p className="text-slate-400 text-sm">
-            The big ideas from this chapter
-          </p>
-        </div>
-        <div className="px-6 pb-6 space-y-3">
-          {insights.map((insight, i) => (
-            <div
-              key={i}
-              className="bg-white/5 rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-colors"
-            >
-              <p className="text-white font-medium text-sm mb-1">
-                <span className="text-teal-400 mr-2">{i + 1}.</span>
-                {insight.title}
-              </p>
-              <p className="text-slate-400 text-sm leading-relaxed">
-                {insight.text}
+    <section>
+      <div className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 rounded-2xl shadow-lg shadow-emerald-200/50 overflow-hidden">
+        <div className="p-8">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-white font-bold text-xl">Key Insights</h2>
+              <p className="text-emerald-200 text-sm">
+                The big ideas from this chapter
               </p>
             </div>
-          ))}
+          </div>
+          <div className="space-y-3">
+            {insights.map((insight, i) => (
+              <div
+                key={i}
+                className="bg-white/10 rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors"
+              >
+                <p className="text-white font-medium text-sm mb-1">
+                  <span className="text-emerald-300 mr-2">{i + 1}.</span>
+                  {insight.title}
+                </p>
+                <p className="text-emerald-100 text-sm leading-relaxed">
+                  {insight.text}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
