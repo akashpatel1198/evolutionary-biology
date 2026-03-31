@@ -66,7 +66,6 @@ interface SimConfig {
   initialSize: number;
   initialSense: number;
   enablePredation: boolean;
-  maxDayLength?: number; // cap on ticks per day (default: unlimited)
   mutationChance?: number; // override global MUTATION_CHANCE
   mutationVariation?: number; // override global MUTATION_VARIATION
 }
@@ -278,7 +277,6 @@ function useForagingSimulation(config: SimConfig) {
   // Compute day length: enough ticks for the most efficient creature to exhaust energy
   function computeDayLength(creatures: Creature[]): number {
     if (creatures.length === 0) return 400;
-    const cfg = configRef.current;
     let maxTicks = 0;
     for (const c of creatures) {
       const cost = energyCost(c);
@@ -286,8 +284,7 @@ function useForagingSimulation(config: SimConfig) {
         maxTicks = Math.max(maxTicks, Math.ceil(STARTING_ENERGY / cost));
       }
     }
-    const dl = Math.max(100, maxTicks);
-    return cfg.maxDayLength ? Math.min(dl, cfg.maxDayLength) : dl;
+    return clamp(maxTicks, 100, 800);
   }
 
   const initialize = useCallback(() => {
@@ -489,13 +486,14 @@ function useForagingSimulation(config: SimConfig) {
           if (Math.random() < 0.05) {
             c.headingTarget += (Math.random() - 0.5) * 1.5;
           }
-          // Near walls, bias heading toward center
-          if (c.x < 20) c.headingTarget = Math.atan2(c.y - fs / 2, fs / 2);
-          else if (c.x > fs - 20)
+          // Near walls, turn toward center (source: TURN_DISTANCE = 60)
+          const wd = 60;
+          if (c.x < wd) c.headingTarget = Math.atan2(c.y - fs / 2, fs / 2);
+          else if (c.x > fs - wd)
             c.headingTarget = Math.atan2(c.y - fs / 2, -(fs / 2));
-          if (c.y < 20)
+          if (c.y < wd)
             c.headingTarget = Math.atan2(fs / 2, c.x - fs / 2);
-          else if (c.y > fs - 20)
+          else if (c.y > fs - wd)
             c.headingTarget = Math.atan2(-(fs / 2), c.x - fs / 2);
         }
 
@@ -906,8 +904,6 @@ function EnvironmentRulesSection() {
 // ============================================================================
 
 function BaselineSimSection() {
-  const [maxDayLen, setMaxDayLen] = useState(400);
-
   const config: SimConfig = useMemo(
     () => ({
       fieldSize: FIELD_SIZE,
@@ -920,9 +916,8 @@ function BaselineSimSection() {
       initialSize: 1.0,
       initialSense: 1.0,
       enablePredation: false,
-      maxDayLength: maxDayLen,
     }),
-    [maxDayLen]
+    []
   );
 
   const {
@@ -1002,22 +997,9 @@ function BaselineSimSection() {
                   Food: {foods.current.filter((f) => !f.eaten).length}
                 </span>
               </div>
-              {/* Day length slider under field */}
-              <div className="mt-3 space-y-1">
-                <label className="flex justify-between text-xs font-medium text-gray-600">
-                  <span>Max day length</span>
-                  <span className="font-mono text-teal-600">{maxDayLen} ticks</span>
-                </label>
-                <input
-                  type="range"
-                  min="150"
-                  max="600"
-                  step="50"
-                  value={maxDayLen}
-                  onChange={(e) => setMaxDayLen(parseInt(e.target.value))}
-                  className="w-full accent-teal-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
-                />
-              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                * Day length is dynamic: the most efficient creature sets the pace ({dayLength} ticks)
+              </p>
             </div>
 
             <div>
@@ -1140,8 +1122,6 @@ function BaselineSimSection() {
 // ============================================================================
 
 function SpeedMutationSection() {
-  const [maxDayLen, setMaxDayLen] = useState(400);
-
   const config: SimConfig = useMemo(
     () => ({
       fieldSize: 200,
@@ -1154,11 +1134,10 @@ function SpeedMutationSection() {
       initialSize: 1.0,
       initialSense: 1.0,
       enablePredation: false,
-      maxDayLength: maxDayLen,
       mutationChance: 0.10,
       mutationVariation: 0.2,
     }),
-    [maxDayLen]
+    []
   );
 
   const {
@@ -1277,22 +1256,9 @@ function SpeedMutationSection() {
                   Food: {foods.current.filter((f) => !f.eaten).length}
                 </span>
               </div>
-              {/* Day length slider under field */}
-              <div className="mt-3 space-y-1">
-                <label className="flex justify-between text-xs font-medium text-gray-600">
-                  <span>Max day length</span>
-                  <span className="font-mono text-blue-600">{maxDayLen} ticks</span>
-                </label>
-                <input
-                  type="range"
-                  min="150"
-                  max="600"
-                  step="50"
-                  value={maxDayLen}
-                  onChange={(e) => setMaxDayLen(parseInt(e.target.value))}
-                  className="w-full accent-blue-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
-                />
-              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                * Day length is dynamic: the most efficient creature sets the pace ({dayLength} ticks)
+              </p>
             </div>
 
             <div>
@@ -1628,25 +1594,38 @@ function EnergyCostModelSection() {
 // ============================================================================
 
 function ThreeTraitsSimSection() {
-  const [maxDayLen, setMaxDayLen] = useState(400);
+  const [preset, setPreset] = useState<"source" | "fast">("source");
 
   const config: SimConfig = useMemo(
-    () => ({
-      fieldSize: 200,
-      foodCount: 150,
-      initialPopulation: 40,
-      mutateSpeed: true,
-      mutateSize: true,
-      mutateSense: true,
-      initialSpeed: 1.0,
-      initialSize: 1.0,
-      initialSense: 1.0,
-      enablePredation: true,
-      maxDayLength: maxDayLen,
-      mutationChance: 0.10,
-      mutationVariation: 0.2,
-    }),
-    [maxDayLen]
+    () =>
+      preset === "source"
+        ? {
+            fieldSize: FIELD_SIZE,
+            foodCount: 100,
+            initialPopulation: 20,
+            mutateSpeed: true,
+            mutateSize: true,
+            mutateSense: true,
+            initialSpeed: 1.0,
+            initialSize: 1.0,
+            initialSense: 1.0,
+            enablePredation: true,
+          }
+        : {
+            fieldSize: 200,
+            foodCount: 150,
+            initialPopulation: 40,
+            mutateSpeed: true,
+            mutateSize: true,
+            mutateSense: true,
+            initialSpeed: 1.0,
+            initialSize: 1.0,
+            initialSense: 1.0,
+            enablePredation: true,
+            mutationChance: 0.10,
+            mutationVariation: 0.2,
+          },
+    [preset]
   );
 
   const {
@@ -1664,6 +1643,15 @@ function ThreeTraitsSimSection() {
     speedMultiplier,
     setSpeedMultiplier,
   } = useForagingSimulation(config);
+
+  // Reset sim when preset changes
+  const prevPreset = useRef(preset);
+  useEffect(() => {
+    if (prevPreset.current !== preset) {
+      prevPreset.current = preset;
+      reset();
+    }
+  }, [preset, reset]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -1778,23 +1766,9 @@ function ThreeTraitsSimSection() {
                   Food: {foods.current.filter((f) => !f.eaten).length}
                 </span>
               </div>
-              <div className="mt-3 space-y-1">
-                <label className="flex justify-between text-xs font-medium text-gray-600">
-                  <span>Max day length</span>
-                  <span className="font-mono text-amber-600">
-                    {maxDayLen} ticks
-                  </span>
-                </label>
-                <input
-                  type="range"
-                  min="150"
-                  max="600"
-                  step="50"
-                  value={maxDayLen}
-                  onChange={(e) => setMaxDayLen(parseInt(e.target.value))}
-                  className="w-full accent-amber-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
-                />
-              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                * Day length is dynamic: the most efficient creature sets the pace ({dayLength} ticks)
+              </p>
             </div>
 
             <div>
@@ -1997,6 +1971,27 @@ function ThreeTraitsSimSection() {
             </div>
           </div>
 
+          {/* Preset toggle */}
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-xs text-gray-500">Params:</span>
+            {([
+              ["source", "1x mutation, 100 food, 20 pop"],
+              ["fast", "2x mutation, 150 food, 40 pop"],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setPreset(key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  preset === key
+                    ? "bg-amber-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           {/* Observation */}
           <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200">
             <p className="text-sm text-amber-700">
@@ -2020,18 +2015,24 @@ function ThreeTraitsSimSection() {
 // ============================================================================
 
 function EnvironmentalChangeSection() {
-  const [maxDayLen, setMaxDayLen] = useState(400);
+  const [preset, setPreset] = useState<"source" | "fast" | "turbo">("source");
 
-  // Food starts at 150, decreases by 1 every 2 days down to 10
-  const [foodOverride, setFoodOverride] = useState(150);
-  const foodOverrideRef = useRef(150);
+  const presetParams = {
+    source: { fieldSize: FIELD_SIZE, food: 100, pop: 20, mChance: MUTATION_CHANCE, mVar: MUTATION_VARIATION, decline: 4 },
+    fast: { fieldSize: 200, food: 150, pop: 40, mChance: 0.10, mVar: 0.2, decline: 4 },
+    turbo: { fieldSize: 200, food: 200, pop: 50, mChance: 0.20, mVar: 0.3, decline: 5 },
+  };
+  const pp = presetParams[preset];
+
+  const [foodOverride, setFoodOverride] = useState(pp.food);
+  const foodOverrideRef = useRef(pp.food);
   foodOverrideRef.current = foodOverride;
 
   const config: SimConfig = useMemo(
     () => ({
-      fieldSize: 200,
+      fieldSize: pp.fieldSize,
       foodCount: foodOverride,
-      initialPopulation: 40,
+      initialPopulation: pp.pop,
       mutateSpeed: true,
       mutateSize: true,
       mutateSense: true,
@@ -2039,11 +2040,10 @@ function EnvironmentalChangeSection() {
       initialSize: 1.0,
       initialSense: 1.0,
       enablePredation: true,
-      maxDayLength: maxDayLen,
-      mutationChance: 0.10,
-      mutationVariation: 0.2,
+      mutationChance: pp.mChance,
+      mutationVariation: pp.mVar,
     }),
-    [maxDayLen, foodOverride]
+    [foodOverride, pp.fieldSize, pp.pop, pp.mChance, pp.mVar]
   );
 
   const {
@@ -2061,22 +2061,35 @@ function EnvironmentalChangeSection() {
     setSpeedMultiplier,
   } = useForagingSimulation(config);
 
-  // Gradually decrease food: every 2 days, reduce by 1 (down to 10)
+  // Gradually decrease food based on preset's decline rate (down to 15)
   const lastFoodUpdateDay = useRef(0);
+  const declineRef = useRef(pp.decline);
+  declineRef.current = pp.decline;
   useEffect(() => {
     if (day > lastFoodUpdateDay.current && day > 1) {
       lastFoodUpdateDay.current = day;
-      if (day % 2 === 0) {
-        setFoodOverride((prev) => Math.max(10, prev - 1));
+      if (day % declineRef.current === 0) {
+        setFoodOverride((prev) => Math.max(15, prev - 1));
       }
     }
   }, [day]);
 
   const handleReset = useCallback(() => {
-    setFoodOverride(150);
+    setFoodOverride(pp.food);
     lastFoodUpdateDay.current = 0;
     reset();
-  }, [reset]);
+  }, [reset, pp.food]);
+
+  // Reset sim when preset changes
+  const prevPreset = useRef(preset);
+  useEffect(() => {
+    if (prevPreset.current !== preset) {
+      prevPreset.current = preset;
+      setFoodOverride(presetParams[preset].food);
+      lastFoodUpdateDay.current = 0;
+      reset();
+    }
+  }, [preset, reset]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -2085,14 +2098,7 @@ function EnvironmentalChangeSection() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    renderCanvas(
-      ctx,
-      creatures,
-      foods.current,
-      config.fieldSize,
-      CANVAS_SIZE,
-      "traits"
-    );
+    renderCanvas(ctx, creatures, foods.current, config.fieldSize, CANVAS_SIZE, "traits");
   }, [renderTrigger, creatures, foods, config.fieldSize]);
 
   const alive = creatures.filter((c) => c.alive);
@@ -2115,9 +2121,9 @@ function EnvironmentalChangeSection() {
       history.map((h) => ({
         ...h,
         foodSupply:
-          150 - Math.floor(Math.max(0, h.day - 1) / 2),
-      })).map((h) => ({ ...h, foodSupply: Math.max(10, h.foodSupply) })),
-    [history]
+          pp.food - Math.floor(Math.max(0, h.day - 1) / pp.decline),
+      })).map((h) => ({ ...h, foodSupply: Math.max(15, h.foodSupply) })),
+    [history, pp.food, pp.decline]
   );
 
   return (
@@ -2136,7 +2142,7 @@ function EnvironmentalChangeSection() {
           <p className="text-gray-600">
             Everything we&apos;ve seen so far has been in a stable environment.
             But what if the environment changes? Here the food supply starts at
-            150 and drops by 1 every 2 days, all the way down to 10. This
+            {pp.food} and drops by 1 every {pp.decline} days, down to 15. This
             completely reshuffles which traits are valuable.
           </p>
 
@@ -2180,23 +2186,9 @@ function EnvironmentalChangeSection() {
                   </span>
                 </span>
               </div>
-              <div className="mt-3 space-y-1">
-                <label className="flex justify-between text-xs font-medium text-gray-600">
-                  <span>Max day length</span>
-                  <span className="font-mono text-rose-600">
-                    {maxDayLen} ticks
-                  </span>
-                </label>
-                <input
-                  type="range"
-                  min="150"
-                  max="600"
-                  step="50"
-                  value={maxDayLen}
-                  onChange={(e) => setMaxDayLen(parseInt(e.target.value))}
-                  className="w-full accent-rose-500 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
-                />
-              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                * Day length is dynamic: the most efficient creature sets the pace ({dayLength} ticks)
+              </p>
             </div>
 
             <div>
@@ -2291,10 +2283,16 @@ function EnvironmentalChangeSection() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-6 gap-2">
             <div className="text-center p-2 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
               <p className="text-xs font-medium text-gray-500 mb-1">Day</p>
               <p className="text-lg font-bold text-gray-700">{day}</p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
+              <p className="text-xs font-medium text-gray-500 mb-1">Pop</p>
+              <p className="text-lg font-bold text-gray-700">
+                {creatures.filter((c) => c.alive).length}
+              </p>
             </div>
             <div className="text-center p-2 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-100">
               <p className="text-xs font-medium text-orange-500 mb-1">Food</p>
@@ -2339,7 +2337,7 @@ function EnvironmentalChangeSection() {
               Reset
             </button>
             <div className="flex items-center gap-1">
-              {[1, 3, 5, 10, 25, 50].map((s) => (
+              {[1, 3, 5, 10, 25, 50, 100, 200].map((s) => (
                 <button
                   key={s}
                   onClick={() => setSpeedMultiplier(s)}
@@ -2355,17 +2353,39 @@ function EnvironmentalChangeSection() {
             </div>
           </div>
 
+          {/* Preset toggle */}
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500">Params:</span>
+            {([
+              ["source", "1x mutation, 100 food, 20 pop"],
+              ["fast", "2x mutation, 150 food, 40 pop"],
+              ["turbo", "4x mutation, 200 food, 50 pop"],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setPreset(key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  preset === key
+                    ? "bg-rose-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           {/* Observation */}
           <div className="bg-gradient-to-r from-rose-50 to-red-50 rounded-xl p-4 border border-rose-200">
             <p className="text-sm text-rose-700">
-              <strong>What to watch for:</strong> As food drops, the population
-              shrinks and the selection pressure changes dramatically. Size tends
-              to decrease because big creatures are too expensive to maintain
-              when food is scarce. Sense becomes extremely valuable because
-              finding the few remaining food items is critical. And speed
-              actually goes <em>up</em>, which can be surprising. When there are
-              only a few food items, it becomes a race. The environment
-              completely reshapes which traits are &quot;fit.&quot;
+              <strong>What to watch for:</strong> As food declines, the selection
+              pressure shifts. Traits that worked in abundance may become
+              liabilities in scarcity. Watch how the trait averages respond as
+              the food supply drops. The population will shrink, and which
+              creatures survive tells you what the environment is now selecting
+              for. Try the turbo preset with high speed to see the full arc
+              play out. The environment completely reshapes which traits
+              are &quot;fit.&quot;
             </p>
           </div>
         </div>
@@ -2441,6 +2461,454 @@ function KeyInsightsSection() {
 }
 
 // ============================================================================
+// SECTION: FULL SANDBOX
+// ============================================================================
+
+function FullSandboxSection() {
+  // --- Parameter state ---
+  const [foodCount, setFoodCount] = useState(100);
+  const [initialPop, setInitialPop] = useState(20);
+  const [fieldSize, setFieldSize] = useState(FIELD_SIZE);
+  const [mutSpeed, setMutSpeed] = useState(true);
+  const [mutSize, setMutSize] = useState(true);
+  const [mutSense, setMutSense] = useState(true);
+  const [predation, setPredation] = useState(true);
+  const [mutChance, setMutChance] = useState(0.05);
+  const [mutVariation, setMutVariation] = useState(0.1);
+  const [initSpeed, setInitSpeed] = useState(1.0);
+  const [initSize, setInitSize] = useState(1.0);
+  const [initSense, setInitSense] = useState(1.0);
+  const [foodMode, setFoodMode] = useState<"constant" | "decline">("constant");
+  const [declineRate, setDeclineRate] = useState(4); // reduce by 1 every N days
+  const [minFood, setMinFood] = useState(15);
+
+  // --- Food override for decline mode ---
+  const [foodOverride, setFoodOverride] = useState(foodCount);
+  const foodOverrideRef = useRef(foodCount);
+  foodOverrideRef.current = foodOverride;
+
+  const config: SimConfig = useMemo(
+    () => ({
+      fieldSize,
+      foodCount: foodMode === "decline" ? foodOverride : foodCount,
+      initialPopulation: initialPop,
+      mutateSpeed: mutSpeed,
+      mutateSize: mutSize,
+      mutateSense: mutSense,
+      initialSpeed: initSpeed,
+      initialSize: initSize,
+      initialSense: initSense,
+      enablePredation: predation,
+      mutationChance: mutChance,
+      mutationVariation: mutVariation,
+    }),
+    [
+      fieldSize, foodCount, foodOverride, foodMode, initialPop,
+      mutSpeed, mutSize, mutSense, initSpeed, initSize, initSense,
+      predation, mutChance, mutVariation,
+    ]
+  );
+
+  const {
+    creatures,
+    foods,
+    day,
+    tickInDay,
+    dayLength,
+    population,
+    history,
+    isRunning,
+    setIsRunning,
+    reset,
+    renderTrigger,
+    speedMultiplier,
+    setSpeedMultiplier,
+  } = useForagingSimulation(config);
+
+  // --- Food decline logic ---
+  const lastFoodUpdateDay = useRef(0);
+  useEffect(() => {
+    if (foodMode !== "decline") return;
+    if (day > lastFoodUpdateDay.current && day > 1) {
+      lastFoodUpdateDay.current = day;
+      if (day % declineRate === 0) {
+        setFoodOverride((prev) => Math.max(minFood, prev - 1));
+      }
+    }
+  }, [day, foodMode, declineRate, minFood]);
+
+  // --- Reset helper ---
+  const handleReset = useCallback(() => {
+    setFoodOverride(foodCount);
+    lastFoodUpdateDay.current = 0;
+    reset();
+  }, [reset, foodCount]);
+
+  // --- Reset when food mode changes ---
+  const prevFoodMode = useRef(foodMode);
+  useEffect(() => {
+    if (prevFoodMode.current !== foodMode) {
+      prevFoodMode.current = foodMode;
+      setFoodOverride(foodCount);
+      lastFoodUpdateDay.current = 0;
+      reset();
+    }
+  }, [foodMode, reset, foodCount]);
+
+  // --- Canvas ---
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const colorMode = (mutSpeed || mutSize || mutSense) ? "traits" : "uniform";
+    renderCanvas(ctx, creatures, foods.current, fieldSize, CANVAS_SIZE, colorMode);
+  }, [renderTrigger, creatures, foods, fieldSize, mutSpeed, mutSize, mutSense]);
+
+  // --- Histograms ---
+  const buildHistogram = useCallback(
+    (trait: "speed" | "size" | "sense") => {
+      const alive = creatures.filter((c) => c.alive);
+      if (alive.length === 0) return [];
+      const bucketSize = 0.2;
+      const values = alive.map((c) => c[trait]);
+      const lo = Math.floor(Math.min(...values) * 5) / 5;
+      const hi = Math.ceil(Math.max(...values) * 5) / 5 + bucketSize;
+      const buckets: { range: string; count: number; val: number }[] = [];
+      for (
+        let v = Math.max(0.1, lo - 0.2);
+        v < hi + 0.2;
+        v = Math.round((v + bucketSize) * 10) / 10
+      ) {
+        buckets.push({
+          range: v.toFixed(1),
+          count: alive.filter((c) => c[trait] >= v && c[trait] < v + bucketSize)
+            .length,
+          val: v,
+        });
+      }
+      return buckets;
+    },
+    [creatures, day] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const speedHist = useMemo(() => buildHistogram("speed"), [buildHistogram]);
+  const sizeHist = useMemo(() => buildHistogram("size"), [buildHistogram]);
+  const senseHist = useMemo(() => buildHistogram("sense"), [buildHistogram]);
+
+  // --- Stats ---
+  const alive = creatures.filter((c) => c.alive);
+  const avgSpeed = alive.length > 0 ? alive.reduce((s, c) => s + c.speed, 0) / alive.length : 0;
+  const avgSize = alive.length > 0 ? alive.reduce((s, c) => s + c.size, 0) / alive.length : 0;
+  const avgSense = alive.length > 0 ? alive.reduce((s, c) => s + c.sense, 0) / alive.length : 0;
+
+  // --- Food supply in history for decline mode ---
+  const historyWithFood = useMemo(() => {
+    if (foodMode !== "decline") return history;
+    return history.map((h) => ({
+      ...h,
+      foodSupply: Math.max(minFood, foodCount - Math.floor(Math.max(0, h.day - 1) / declineRate)),
+    }));
+  }, [history, foodMode, foodCount, declineRate, minFood]);
+
+  // --- Slider helper ---
+  const SliderRow = ({ label, value, onChange, min, max, step, displayValue }: {
+    label: string; value: number; onChange: (v: number) => void;
+    min: number; max: number; step: number; displayValue?: string;
+  }) => (
+    <div className="flex items-center gap-3">
+      <span className="text-xs text-gray-600 w-28 shrink-0">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="flex-1 h-1.5 accent-violet-500"
+      />
+      <span className="text-xs font-mono text-gray-700 w-12 text-right">
+        {displayValue ?? value}
+      </span>
+    </div>
+  );
+
+  // --- Toggle helper ---
+  const Toggle = ({ label, checked, onChange }: {
+    label: string; checked: boolean; onChange: (v: boolean) => void;
+  }) => (
+    <label className="flex items-center gap-2 cursor-pointer">
+      <div
+        className={`w-8 h-4 rounded-full transition-colors relative ${checked ? "bg-violet-500" : "bg-gray-300"}`}
+        onClick={() => onChange(!checked)}
+      >
+        <div
+          className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : "translate-x-0.5"}`}
+        />
+      </div>
+      <span className="text-xs text-gray-600">{label}</span>
+    </label>
+  );
+
+  return (
+    <section className="space-y-4">
+      <div className="bg-white rounded-2xl shadow-lg shadow-violet-100/50 border border-violet-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-6 py-4">
+          <h2 className="text-white font-semibold text-lg">
+            Sandbox Mode
+          </h2>
+          <p className="text-violet-100 text-sm">
+            Full parameter control — tweak everything and see what emerges
+          </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Controls panel */}
+          <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl p-4 border border-violet-200 space-y-4">
+            <p className="text-xs font-semibold text-violet-700 uppercase tracking-wide">Parameters</p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+              {/* Left column: environment */}
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Environment</p>
+                <SliderRow label="Food count" value={foodMode === "decline" ? foodCount : foodCount} onChange={(v) => { setFoodCount(v); if (foodMode === "constant") setFoodOverride(v); }} min={10} max={300} step={5} />
+                <SliderRow label="Initial population" value={initialPop} onChange={setInitialPop} min={5} max={100} step={5} />
+                <SliderRow label="Field size" value={fieldSize} onChange={setFieldSize} min={100} max={300} step={10} />
+
+                <div className="pt-1 space-y-2">
+                  <p className="text-xs font-medium text-gray-500">Food Mode</p>
+                  <div className="flex gap-2">
+                    {(["constant", "decline"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setFoodMode(mode)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          foodMode === mode
+                            ? "bg-violet-600 text-white"
+                            : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+                        }`}
+                      >
+                        {mode === "constant" ? "Constant" : "Declining"}
+                      </button>
+                    ))}
+                  </div>
+                  {foodMode === "decline" && (
+                    <div className="space-y-2 pl-2 border-l-2 border-violet-200">
+                      <SliderRow label="Decline every N days" value={declineRate} onChange={setDeclineRate} min={1} max={10} step={1} />
+                      <SliderRow label="Min food" value={minFood} onChange={setMinFood} min={5} max={50} step={5} />
+                    </div>
+                  )}
+                </div>
+
+                <Toggle label="Predation" checked={predation} onChange={setPredation} />
+              </div>
+
+              {/* Right column: traits & mutations */}
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Traits &amp; Mutations</p>
+
+                <div className="space-y-2">
+                  <Toggle label="Mutate speed" checked={mutSpeed} onChange={setMutSpeed} />
+                  <Toggle label="Mutate size" checked={mutSize} onChange={setMutSize} />
+                  <Toggle label="Mutate sense" checked={mutSense} onChange={setMutSense} />
+                </div>
+
+                <SliderRow label="Mutation chance" value={mutChance} onChange={setMutChance} min={0.01} max={0.5} step={0.01} displayValue={`${(mutChance * 100).toFixed(0)}%`} />
+                <SliderRow label="Mutation variation" value={mutVariation} onChange={setMutVariation} min={0.05} max={0.5} step={0.05} displayValue={`\u00b1${mutVariation.toFixed(2)}`} />
+
+                <div className="pt-1">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Initial Trait Values</p>
+                  <div className="space-y-2">
+                    <SliderRow label="Speed" value={initSpeed} onChange={setInitSpeed} min={0.5} max={3.0} step={0.1} displayValue={initSpeed.toFixed(1)} />
+                    <SliderRow label="Size" value={initSize} onChange={setInitSize} min={0.5} max={3.0} step={0.1} displayValue={initSize.toFixed(1)} />
+                    <SliderRow label="Sense" value={initSense} onChange={setInitSense} min={0.5} max={3.0} step={0.1} displayValue={initSense.toFixed(1)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-violet-500 text-center italic">
+              Changes apply on next Reset
+            </p>
+          </div>
+
+          {/* Canvas + Chart */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Foraging Field{" "}
+                <span className="text-xs text-gray-400 font-normal">
+                  (color: red=speed, blue=size, green=sense)
+                </span>
+              </p>
+              <div className="relative">
+                <canvas
+                  ref={canvasRef}
+                  width={CANVAS_SIZE}
+                  height={CANVAS_SIZE}
+                  className="w-full rounded-xl border border-gray-200"
+                  style={{ imageRendering: "auto" }}
+                />
+                {speedMultiplier >= 25 && isRunning && (
+                  <div className="absolute inset-0 bg-slate-900/80 rounded-xl flex flex-col items-center justify-center">
+                    <div className="text-white font-semibold text-lg">Fast Forwarding</div>
+                    <div className="text-slate-300 text-sm mt-1">{speedMultiplier}x speed · Day {day}</div>
+                    <div className="mt-3 w-8 h-8 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                <span>Day {day}, tick {tickInDay}/{dayLength}</span>
+                <span>
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>
+                  Food: {foodMode === "decline" ? `${foodOverride}/day` : `${foods.current.filter((f) => !f.eaten).length}`}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                * Day length is dynamic: the most efficient creature sets the pace ({dayLength} ticks)
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Traits &amp; Population
+              </p>
+              <ResponsiveContainer width="100%" height={CANVAS_SIZE - 20}>
+                <LineChart data={historyWithFood}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="day"
+                    fontSize={11}
+                    stroke="#9ca3af"
+                    label={{ value: "Day", position: "insideBottomRight", offset: -5, fontSize: 11 }}
+                  />
+                  <YAxis yAxisId="left" fontSize={11} stroke="#9ca3af" />
+                  <YAxis yAxisId="right" orientation="right" fontSize={11} stroke="#9ca3af" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#fff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+                  <Legend verticalAlign="top" height={30} />
+                  <Line yAxisId="right" type="monotone" dataKey="population" name="Population" stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="4 2" dot={false} isAnimationActive={false} />
+                  {foodMode === "decline" && (
+                    <Line yAxisId="right" type="monotone" dataKey="foodSupply" name="Food/Day" stroke="#f97316" strokeWidth={2} strokeDasharray="6 3" dot={false} isAnimationActive={false} />
+                  )}
+                  <Line yAxisId="left" type="monotone" dataKey="avgSpeed" name="Avg Speed" stroke="#ef4444" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  <Line yAxisId="left" type="monotone" dataKey="avgSize" name="Avg Size" stroke="#6366f1" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  <Line yAxisId="left" type="monotone" dataKey="avgSense" name="Avg Sense" stroke="#22c55e" strokeWidth={2} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Three histograms */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs font-medium text-red-600 mb-1 text-center">Speed Distribution</p>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={speedHist}>
+                  <XAxis dataKey="range" fontSize={9} stroke="#9ca3af" />
+                  <YAxis fontSize={9} stroke="#9ca3af" width={25} />
+                  <Bar dataKey="count" fill="#ef4444" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-indigo-600 mb-1 text-center">Size Distribution</p>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={sizeHist}>
+                  <XAxis dataKey="range" fontSize={9} stroke="#9ca3af" />
+                  <YAxis fontSize={9} stroke="#9ca3af" width={25} />
+                  <Bar dataKey="count" fill="#6366f1" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-green-600 mb-1 text-center">Sense Distribution</p>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={senseHist}>
+                  <XAxis dataKey="range" fontSize={9} stroke="#9ca3af" />
+                  <YAxis fontSize={9} stroke="#9ca3af" width={25} />
+                  <Bar dataKey="count" fill="#22c55e" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-6 gap-2">
+            <div className="text-center p-2 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
+              <p className="text-xs font-medium text-gray-500 mb-1">Day</p>
+              <p className="text-lg font-bold text-gray-700">{day}</p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
+              <p className="text-xs font-medium text-gray-500 mb-1">Pop</p>
+              <p className="text-lg font-bold text-gray-700">{population}</p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-100">
+              <p className="text-xs font-medium text-orange-500 mb-1">Food</p>
+              <p className="text-lg font-bold text-orange-600">{foodMode === "decline" ? foodOverride : foodCount}</p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-red-50 to-rose-50 rounded-xl border border-red-100">
+              <p className="text-xs font-medium text-red-500 mb-1">Speed</p>
+              <p className="text-lg font-bold text-red-600">{avgSpeed.toFixed(2)}</p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-indigo-50 to-violet-50 rounded-xl border border-indigo-100">
+              <p className="text-xs font-medium text-indigo-500 mb-1">Size</p>
+              <p className="text-lg font-bold text-indigo-600">{avgSize.toFixed(2)}</p>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
+              <p className="text-xs font-medium text-green-500 mb-1">Sense</p>
+              <p className="text-lg font-bold text-green-600">{avgSense.toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => setIsRunning(!isRunning)}
+              className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 ${
+                isRunning
+                  ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+                  : "bg-gradient-to-r from-violet-500 to-purple-600 text-white"
+              }`}
+            >
+              {isRunning ? "Pause" : "Start"}
+            </button>
+            <button
+              onClick={handleReset}
+              className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold text-gray-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+            >
+              Reset
+            </button>
+            <div className="flex items-center gap-1">
+              {[1, 3, 5, 10, 25, 50, 100, 200].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSpeedMultiplier(s)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    speedMultiplier === s
+                      ? "bg-violet-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {s}x
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
 // MAIN PAGE
 // ============================================================================
 
@@ -2457,6 +2925,7 @@ export default function Page5() {
         <ThreeTraitsSimSection />
         <EnvironmentalChangeSection />
         <KeyInsightsSection />
+        <FullSandboxSection />
 
         <div className="h-8"></div>
       </div>
