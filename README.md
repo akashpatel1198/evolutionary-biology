@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Evolutionary Biology Simulations
 
-## Getting Started
+Interactive simulations that teach evolutionary biology concepts through hands-on visualizations. Inspired by the [Primer](https://www.youtube.com/c/PrimerLearning) YouTube channel.
 
-First, run the development server:
+Each chapter builds on the last, starting from basic birth/death equilibrium and working up to full agent-based natural selection with heritable traits, energy costs, and predation.
+
+## Tech Stack
+
+- Next.js 16 (App Router)
+- React 19, TypeScript 5
+- Tailwind CSS 4
+- Recharts (population/trait charts)
+- React Flow (mutation tree diagrams)
+- HTML5 Canvas (creature rendering)
+
+## Live Version
+
+> **[https://evolutionary-biology.vercel.app/](https://evolutionary-biology.vercel.app/)
+
+The home page shows a grid of 9 chapter cards. Click any active chapter to open its simulation. Each page has interactive sliders to tweak parameters (birth rate, death rate, mutation rate, etc.) and real-time charts showing population dynamics. Pages 1-5 are complete, pages 6-9 are coming soon.
+
+## Local Development
+
+### Prerequisites
+
+- Node.js (v18+)
+- npm
+
+### Setup
 
 ```bash
+git clone https://github.com/akashpatel1198/evolutionary-biology.git
+cd evolutionary-biology
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | What it does |
+|---------|-------------|
+| `npm run dev` | Start dev server with hot reload |
+| `npm run build` | Production build |
+| `npm start` | Serve the production build |
+| `npm run lint` | Run ESLint |
 
-## Learn More
+### Environment Variables
 
-To learn more about Next.js, take a look at the following resources:
+None. Everything runs client-side with no external APIs or services.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/
+  layout.tsx              # Root layout (fonts, metadata)
+  page.tsx                # Home page (chapter grid)
+  globals.css             # Global styles + Tailwind
+  components/
+    Sidebar.tsx           # Nav sidebar (desktop fixed, mobile hamburger)
+  (pages)/
+    layout.tsx            # Shared layout for all chapter pages
+    1/page.tsx            # Equilibrium (N* = B/D)
+    2/page.tsx            # Exponential growth (replication)
+    3/page.tsx            # Mutations (heritable traits, mutation trees)
+    4/page.tsx            # Carrying capacity (logistic growth)
+    5/page.tsx            # Natural selection (2D agent-based sim, sandbox mode)
+    6-9/page.tsx          # Placeholder stubs (coming soon)
+public/                   # Static assets (SVGs)
+```
 
-## Deploy on Vercel
+## Chapter Overview
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| # | Title | Concept | Status |
+|---|-------|---------|--------|
+| 1 | Why Do Things Exist? | Birth/death equilibrium | Done |
+| 2 | Exponential Growth | Replication dynamics | Done |
+| 3 | Mutations | Heritable trait variation, mutation trees | Done |
+| 4 | Carrying Capacity | Density-dependent death, logistic growth | Done |
+| 5 | Natural Selection | Agent-based 2D foraging with speed/size/sense traits | Done |
+| 6 | Selfish Genes | | Planned |
+| 7 | Hawk-Dove Game | | Planned |
+| 8 | Green Beard | | Planned |
+| 9 | Kin Selection | | Planned |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Page 5 is the most involved. Creatures have three heritable traits (speed, size, sense radius), each with energy costs. They forage for food on a 2D canvas, reproduce if they eat enough, and die if they don't. It includes a sandbox mode with full parameter control.
+
+## Deployment
+
+Built for Vercel. Push to main and it deploys automatically if connected, or run:
+
+```bash
+npx vercel
+```
