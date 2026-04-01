@@ -177,6 +177,7 @@ function ExponentialGrowthSection() {
                 </label>
                 <input
                   type="range"
+                  aria-label="Replication rate"
                   min="0"
                   max="0.2"
                   step="0.01"
@@ -195,6 +196,7 @@ function ExponentialGrowthSection() {
                 </label>
                 <input
                   type="range"
+                  aria-label="Death rate"
                   min="0"
                   max="0.2"
                   step="0.01"
@@ -473,7 +475,7 @@ function CrowdingSection() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2">
                   <label className="flex justify-between text-sm font-medium text-gray-700">
                     <span>R</span>
@@ -483,6 +485,7 @@ function CrowdingSection() {
                   </label>
                   <input
                     type="range"
+                    aria-label="Replication rate"
                     min="0.01"
                     max="0.2"
                     step="0.01"
@@ -501,6 +504,7 @@ function CrowdingSection() {
                   </label>
                   <input
                     type="range"
+                    aria-label="Death rate"
                     min="0"
                     max="0.15"
                     step="0.01"
@@ -519,6 +523,7 @@ function CrowdingSection() {
                   </label>
                   <input
                     type="range"
+                    aria-label="Crowding coefficient"
                     min="0.0005"
                     max="0.005"
                     step="0.0001"
@@ -924,6 +929,7 @@ function LogisticGrowthSection() {
                   </label>
                   <input
                     type="range"
+                    aria-label="Replication rate"
                     min="0.02"
                     max="0.25"
                     step="0.01"
@@ -946,6 +952,7 @@ function LogisticGrowthSection() {
                   </label>
                   <input
                     type="range"
+                    aria-label="Death rate"
                     min="0.01"
                     max={R - 0.01}
                     step="0.01"
@@ -965,6 +972,7 @@ function LogisticGrowthSection() {
                   </label>
                   <input
                     type="range"
+                    aria-label="Carrying capacity"
                     min="10"
                     max="1000"
                     step="10"
@@ -1280,7 +1288,7 @@ function CompetitionSection() {
             everyone.
           </p>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {/* Blue: R=10%, D=5%, net=+5% (growing) */}
             <div className="bg-blue-50 rounded-lg p-3 border border-green-200 shadow-md shadow-green-200/60 text-center transition-all">
               <div className="w-5 h-5 rounded-full bg-blue-500 mx-auto mb-1" />
@@ -1360,9 +1368,11 @@ function CompetitionSection() {
             <div className="flex-shrink-0">
               <canvas
                 ref={canvasRef}
+                role="img"
+                aria-label="Carrying capacity simulation visualization"
                 width={CANVAS_SIZE}
                 height={CANVAS_SIZE}
-                className="border border-slate-200 rounded-xl"
+                className="border border-slate-200 rounded-xl max-w-full h-auto"
               />
             </div>
 
@@ -1848,7 +1858,7 @@ function CompetitionSandboxSection() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-1">
                         <label className="text-xs text-gray-500 flex justify-between">
                           <span>R (replication)</span>
@@ -2083,7 +2093,7 @@ export default function Page4() {
               rel="noopener noreferrer"
               className="text-sm font-medium text-gray-500 hover:text-red-600 bg-gray-100 hover:bg-red-50 px-3 py-1 rounded-full transition-colors flex items-center gap-1"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
               </svg>
               Watch Video

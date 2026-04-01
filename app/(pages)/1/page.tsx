@@ -214,7 +214,7 @@ export default function Page1() {
               rel="noopener noreferrer"
               className="text-sm font-medium text-gray-500 hover:text-red-600 bg-gray-100 hover:bg-red-50 px-3 py-1 rounded-full transition-colors flex items-center gap-1"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
               </svg>
               Watch Video
@@ -317,8 +317,9 @@ export default function Page1() {
                         onClick={() => removeSimulation(sim.id)}
                         className="ml-1 p-0.5 text-gray-400 hover:text-red-500 rounded transition-colors"
                         title="Remove"
+                        aria-label="Remove simulation"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
@@ -328,21 +329,21 @@ export default function Page1() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
                   <p className="text-sm font-medium text-gray-500 mb-1">Tick</p>
-                  <p className="text-3xl font-bold text-gray-700">{tick}</p>
-                  <p className="text-xs text-gray-400 mt-1">/ {MAX_TICKS.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-gray-700 tabular-nums">{tick}</p>
+                  <p className="text-xs text-gray-400 mt-1 tabular-nums">/ {MAX_TICKS.toLocaleString()}</p>
                 </div>
                 <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
                   <p className="text-sm font-medium text-gray-500 mb-1">Total Population</p>
-                  <p className="text-3xl font-bold text-emerald-600">
+                  <p className="text-3xl font-bold text-emerald-600 tabular-nums">
                     {simulations.reduce((sum, s) => sum + s.entities.length, 0)}
                   </p>
                 </div>
                 <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
                   <p className="text-sm font-medium text-gray-500 mb-1">Avg Population</p>
-                  <p className="text-3xl font-bold text-blue-600">
+                  <p className="text-3xl font-bold text-blue-600 tabular-nums">
                     {simulations.length > 0
                       ? (simulations.reduce((sum, s) => sum + s.entities.length, 0) / simulations.length).toFixed(1)
                       : "0"}
@@ -407,7 +408,7 @@ export default function Page1() {
               </div>
 
               {/* Shared Parameters */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="flex justify-between text-sm font-medium text-gray-700">
                     <span>Birth Rate (B)</span>
@@ -423,6 +424,7 @@ export default function Page1() {
                     value={birthRate}
                     onChange={(e) => setBirthRate(parseFloat(e.target.value))}
                     className="w-full accent-emerald-500 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                    aria-label="Birth rate"
                   />
                   <p className="text-xs text-gray-500">
                     Probability of creation per tick
@@ -444,6 +446,7 @@ export default function Page1() {
                     value={deathRate}
                     onChange={(e) => setDeathRate(parseFloat(e.target.value))}
                     className="w-full accent-red-500 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                    aria-label="Death rate"
                   />
                   <p className="text-xs text-gray-500">
                     Probability of destruction per entity
@@ -456,7 +459,7 @@ export default function Page1() {
 
         {/* The Model Card */}
         <section className="group">
-          <div className="bg-white rounded-2xl shadow-lg shadow-emerald-100/50 border border-emerald-100 overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-emerald-100/50 hover:border-emerald-200">
+          <div className="bg-white rounded-2xl shadow-lg shadow-emerald-100/50 border border-emerald-100 overflow-hidden">
             <div className="bg-gradient-to-r from-violet-500 to-purple-500 px-6 py-4">
               <h2 className="text-white font-semibold text-lg">The Model</h2>
               <p className="text-violet-100 text-sm">
@@ -514,6 +517,7 @@ for each entity:
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"

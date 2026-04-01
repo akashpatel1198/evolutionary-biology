@@ -249,9 +249,11 @@ function MutationIntroSection() {
             <div className="flex-shrink-0">
               <canvas
                 ref={canvasRef}
+                role="img"
+                aria-label="Mutation simulation visualization"
                 width={SMALL_CANVAS}
                 height={SMALL_CANVAS}
-                className="border border-slate-200 rounded-xl"
+                className="border border-slate-200 rounded-xl max-w-full h-auto"
               />
             </div>
 
@@ -318,6 +320,7 @@ function MutationIntroSection() {
                 </label>
                 <input
                   type="range"
+                  aria-label="Mutation chance"
                   min="0"
                   max="0.3"
                   step="0.01"
@@ -809,9 +812,11 @@ function TreeSimulationSection() {
             <div className="flex-shrink-0">
               <canvas
                 ref={canvasRef}
+                role="img"
+                aria-label="Mutation simulation visualization"
                 width={LARGE_CANVAS}
                 height={LARGE_CANVAS}
-                className="border border-slate-200 rounded-xl"
+                className="border border-slate-200 rounded-xl max-w-full h-auto"
               />
             </div>
 
@@ -890,6 +895,7 @@ function TreeSimulationSection() {
                   </label>
                   <input
                     type="range"
+                    aria-label="Simulation speed"
                     min="30"
                     max="150"
                     step="10"
@@ -972,6 +978,7 @@ function KeyInsightSection() {
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -1051,6 +1058,7 @@ function KeyInsightSection() {
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -1800,6 +1808,7 @@ function CustomMutationTreeSection() {
                         </label>
                         <input
                           type="range"
+                          aria-label="Death rate"
                           min="0"
                           max="30"
                           value={s.deathRate * 100}
@@ -1813,6 +1822,7 @@ function CustomMutationTreeSection() {
                         </label>
                         <input
                           type="range"
+                          aria-label="Replication rate"
                           min="0"
                           max="30"
                           value={s.replicationRate * 100}
@@ -1858,6 +1868,8 @@ function CustomMutationTreeSection() {
             <div>
               <canvas
                 ref={canvasRef}
+                role="img"
+                aria-label="Mutation simulation visualization"
                 width={SANDBOX_CANVAS}
                 height={SANDBOX_CANVAS}
                 className="rounded-xl border border-gray-200 w-full"
@@ -1914,6 +1926,7 @@ function CustomMutationTreeSection() {
               <span className="text-xs text-gray-500">Speed:</span>
               <input
                 type="range"
+                aria-label="Simulation speed"
                 min="30"
                 max="150"
                 step="10"
@@ -2220,13 +2233,14 @@ function FreeEvolutionSection() {
               </div>
             </div>
             
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="text-xs text-gray-600 block mb-1">
                   Birth Rate (B): {(birthRate * 100).toFixed(0)}%
                 </label>
                 <input
                   type="range"
+                  aria-label="Birth rate"
                   min="10"
                   max="100"
                   value={birthRate * 100}
@@ -2240,6 +2254,7 @@ function FreeEvolutionSection() {
                 </label>
                 <input
                   type="range"
+                  aria-label="Replication rate"
                   min="1"
                   max="20"
                   value={startingR * 100}
@@ -2259,6 +2274,7 @@ function FreeEvolutionSection() {
                 </label>
                 <input
                   type="range"
+                  aria-label="Death rate"
                   min={startingR * 100}
                   max="30"
                   value={startingD * 100}
@@ -2287,6 +2303,7 @@ function FreeEvolutionSection() {
                 </label>
                 <input
                   type="range"
+                  aria-label="Mutation rate"
                   min="1"
                   max="50"
                   value={mutationRate * 100}
@@ -2301,6 +2318,7 @@ function FreeEvolutionSection() {
                 </label>
                 <input
                   type="range"
+                  aria-label="Mutation impact"
                   min="5"
                   max="100"
                   value={mutationImpact * 1000}
@@ -2315,6 +2333,7 @@ function FreeEvolutionSection() {
                 </label>
                 <input
                   type="range"
+                  aria-label="Visibility threshold"
                   min="1"
                   max="20"
                   value={visibilityThreshold}
@@ -2423,9 +2442,11 @@ function FreeEvolutionSection() {
           <div className="flex justify-center">
             <canvas
               ref={canvasRef}
+              role="img"
+              aria-label="Mutation simulation visualization"
               width={SANDBOX_CANVAS}
               height={SANDBOX_CANVAS}
-              className="rounded-xl border border-gray-200"
+              className="rounded-xl border border-gray-200 max-w-full h-auto"
             />
           </div>
 
@@ -2435,6 +2456,7 @@ function FreeEvolutionSection() {
               <span className="text-xs text-gray-500">Speed:</span>
               <input
                 type="range"
+                aria-label="Simulation speed"
                 min="20"
                 max="120"
                 step="10"
@@ -2507,7 +2529,7 @@ export default function Page3() {
               rel="noopener noreferrer"
               className="text-sm font-medium text-gray-500 hover:text-red-600 bg-gray-100 hover:bg-red-50 px-3 py-1 rounded-full transition-colors flex items-center gap-1"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
               </svg>
               Watch Video

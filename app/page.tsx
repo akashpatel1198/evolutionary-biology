@@ -35,6 +35,7 @@ export default function Home() {
               <div
                 key={sim.id}
                 className="px-4 py-4 bg-gray-200 text-gray-400 rounded-lg cursor-not-allowed opacity-60"
+                aria-disabled="true"
               >
                 <span className="text-2xl font-bold">{sim.id}</span>
                 <p className="text-sm font-medium mt-1">{sim.title}</p>

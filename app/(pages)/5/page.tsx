@@ -768,7 +768,7 @@ function HeroSection() {
           rel="noopener noreferrer"
           className="text-sm font-medium text-gray-500 hover:text-red-600 bg-gray-100 hover:bg-red-50 px-3 py-1 rounded-full transition-colors flex items-center gap-1"
         >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
           </svg>
           Watch Video
@@ -849,7 +849,7 @@ function EnvironmentRulesSection() {
             Here are the rules:
           </p>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-4 border border-red-200 text-center">
               <div className="text-3xl mb-2">0</div>
               <p className="text-sm font-semibold text-red-700">food found</p>
@@ -975,6 +975,8 @@ function BaselineSimSection() {
               <div className="relative">
                 <canvas
                   ref={canvasRef}
+                  role="img"
+                  aria-label="Natural selection simulation visualization"
                   width={CANVAS_SIZE}
                   height={CANVAS_SIZE}
                   className="w-full rounded-xl border border-gray-200"
@@ -1044,7 +1046,7 @@ function BaselineSimSection() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="text-center p-3 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
               <p className="text-sm font-medium text-gray-500 mb-1">Day</p>
               <p className="text-2xl font-bold text-gray-700">{day}</p>
@@ -1234,6 +1236,8 @@ function SpeedMutationSection() {
               <div className="relative">
                 <canvas
                   ref={canvasRef}
+                  role="img"
+                  aria-label="Natural selection simulation visualization"
                   width={CANVAS_SIZE}
                   height={CANVAS_SIZE}
                   className="w-full rounded-xl border border-gray-200"
@@ -1740,6 +1744,8 @@ function ThreeTraitsSimSection() {
               <div className="relative">
                 <canvas
                   ref={canvasRef}
+                  role="img"
+                  aria-label="Natural selection simulation visualization"
                   width={CANVAS_SIZE}
                   height={CANVAS_SIZE}
                   className="w-full rounded-xl border border-gray-200"
@@ -2158,6 +2164,8 @@ function EnvironmentalChangeSection() {
               <div className="relative">
                 <canvas
                   ref={canvasRef}
+                  role="img"
+                  aria-label="Natural selection simulation visualization"
                   width={CANVAS_SIZE}
                   height={CANVAS_SIZE}
                   className="w-full rounded-xl border border-gray-200"
@@ -2763,6 +2771,8 @@ function FullSandboxSection() {
               <div className="relative">
                 <canvas
                   ref={canvasRef}
+                  role="img"
+                  aria-label="Natural selection simulation visualization"
                   width={CANVAS_SIZE}
                   height={CANVAS_SIZE}
                   className="w-full rounded-xl border border-gray-200"
@@ -2909,7 +2919,7 @@ function FullSandboxSection() {
                 <button
                   key={s}
                   onClick={() => setSpeedMultiplier(s)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-3 py-2.5 min-w-[44px] min-h-[44px] rounded-lg text-sm font-medium transition-colors ${
                     speedMultiplier === s
                       ? "bg-violet-600 text-white"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
